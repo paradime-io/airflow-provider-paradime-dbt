@@ -25,11 +25,9 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-
-        self.conn_id = conn_id
         self.schedule_name = schedule_name
+        self.hook = ParadimeHook(conn_id=conn_id)
 
     def execute(self, context: Context) -> int:
-        hook = ParadimeHook(conn_id=self.conn_id)
-        run_id = hook.trigger_schedule_run(schedule_name=self.schedule_name)
+        run_id = self.hook.trigger_schedule_run(schedule_name=self.schedule_name)
         return run_id
