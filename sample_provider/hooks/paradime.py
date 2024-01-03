@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from airflow.hooks.base import BaseHook
+import requests
 
 
 class ParadimeHook(BaseHook):
@@ -58,4 +59,45 @@ class ParadimeHook(BaseHook):
             api_key=extra["api_key"],
             api_secret=extra["api_secret"],
         )
+    
+    def get_api_endpoint(self) -> str:
+        return self.get_auth_config().api_endpoint
+    
+    def get_request_headers(self) -> dict[str, str]:
+        return {
+            "Content-Type": "application/json",
+            "X-API-KEY": self.get_auth_config().api_key,
+            "X-API-SECRET": self.get_auth_config().api_secret,
+        }
 
+    def _extract_gql_response(
+        request: requests.Response, query_name: str, field: str,
+    ) -> str:
+        response_json = request.json()
+        if "errors" in response_json:
+            raise Exception(f"{response_json['errors']}")
+
+        try:
+            return response_json["data"][query_name][field]
+        except (TypeError, KeyError) as e:
+            raise ValueError(f"{e}: {response_json}")
+
+    def trigger_schedule_run(self, schedule_name: str) -> int:
+        query = """
+            mutation trigger($scheduleName: String!) {
+                triggerBoltRun(scheduleName: $scheduleName){
+                    runId
+                }
+            }
+        """
+
+        response = requests.post(
+            url=self.get_api_endpoint(),
+            json={"query": query, "variables": {"scheduleName": schedule_name}},
+            headers=self.get_request_headers(),
+        )
+        response.raise_for_status()
+
+        run_id = response.json()["data"]["triggerBoltRun"]["runId"]
+
+        return run_id

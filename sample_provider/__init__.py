@@ -12,6 +12,6 @@ def get_provider_info():
                 "hook-class-name": "sample_provider.hooks.paradime.ParadimeHook",
             }
         ],
-        "extra-links": ["sample_provider.operators.sample.SampleOperatorExtraLink"],
+        "extra-links": [],
         "versions": [__version__],  # Required
     }
