@@ -70,17 +70,6 @@ class ParadimeHook(BaseHook):
             "X-API-SECRET": self.get_auth_config().api_secret,
         }
 
-    def _extract_gql_response(
-        request: requests.Response, query_name: str, field: str,
-    ) -> str:
-        response_json = request.json()
-        if "errors" in response_json:
-            raise Exception(f"{response_json['errors']}")
-
-        try:
-            return response_json["data"][query_name][field]
-        except (TypeError, KeyError) as e:
-            raise ValueError(f"{e}: {response_json}")
 
     def trigger_schedule_run(self, schedule_name: str) -> int:
         query = """
@@ -101,3 +90,22 @@ class ParadimeHook(BaseHook):
         run_id = response.json()["data"]["triggerBoltRun"]["runId"]
 
         return run_id
+
+    def get_schedule_run_status(self, run_id: int) -> str:
+        query = """
+            query boltRunStatus($runId: Int!) {
+                boltRunStatus(runId: $runId) {
+                    state
+                }
+            }
+        """
+
+        response = requests.post(
+            url=self.get_api_endpoint(),
+            json={"query": query, "variables": {"runId": int(run_id)}}, 
+            headers=self.get_request_headers(),
+        )
+        response.raise_for_status()
+        state = response.json()["data"]["boltRunStatus"]["state"]
+
+        return state

@@ -24,4 +24,4 @@ operators:
   - module: sample_provider.operators.paradime.ParadimeBoltDbtScheduleRunOperator
 
 sensors:
-  - module: sample_provider.sensors.sample.SampleSensor
+  - module: sample_provider.sensors.paradime.ParadimeBoltDbtScheduleRunSensor
