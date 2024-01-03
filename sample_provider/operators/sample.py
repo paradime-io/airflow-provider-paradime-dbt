@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from airflow.exceptions import AirflowException
 from airflow.models import BaseOperator, BaseOperatorLink
 
-from sample_provider.hooks.sample import SampleHook
+from sample_provider.hooks.paradime import ParadimeHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
@@ -55,7 +55,7 @@ class SampleOperator(BaseOperator):
         data: Any | None = None,
         headers: dict[str, str] | None = None,
         extra_options: dict[str, Any] | None = None,
-        sample_conn_id: str = SampleHook.default_conn_name,
+        sample_conn_id: str = ParadimeHook.default_conn_name,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -69,7 +69,7 @@ class SampleOperator(BaseOperator):
             raise AirflowException("'xcom_push' was deprecated, use 'BaseOperator.do_xcom_push' instead")
 
     def execute(self, context: Context) -> Any:
-        hook = SampleHook(self.method, sample_conn_id=self.sample_conn_id)
+        hook = ParadimeHook(conn_id=self.sample_conn_id)
 
         self.log.info("Call HTTP method")
         response = hook.run(self.endpoint, self.data, self.headers)

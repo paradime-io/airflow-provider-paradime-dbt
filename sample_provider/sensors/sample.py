@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from airflow.exceptions import AirflowException
 from airflow.sensors.base import BaseSensorOperator
 
-from sample_provider.hooks.sample import SampleHook
+from sample_provider.hooks.paradime import ParadimeHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
@@ -38,7 +38,7 @@ class SampleSensor(BaseSensorOperator):
         self,
         *,
         endpoint: str,
-        sample_conn_id: str = SampleHook.default_conn_name,
+        sample_conn_id: str = ParadimeHook.default_conn_name,
         method: str = "GET",
         request_params: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
@@ -50,7 +50,7 @@ class SampleSensor(BaseSensorOperator):
         self.request_params = request_params or {}
         self.headers = headers or {}
 
-        self.hook = SampleHook(method=method, sample_conn_id=sample_conn_id)
+        self.hook = ParadimeHook(conn_id=sample_conn_id)
 
     def poke(self, context: Context) -> bool:
         self.log.info("Poking: %s", self.endpoint)

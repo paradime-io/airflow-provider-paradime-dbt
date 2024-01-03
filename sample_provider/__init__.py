@@ -8,8 +8,8 @@ def get_provider_info():
         "description": "A sample template for Apache Airflow providers.",  # Required
         "connection-types": [
             {
-                "connection-type": "sample",
-                "hook-class-name": "sample_provider.hooks.sample.SampleHook"
+                "connection-type": "paradime",
+                "hook-class-name": "sample_provider.hooks.paradime.ParadimeHook",
             }
         ],
         "extra-links": ["sample_provider.operators.sample.SampleOperatorExtraLink"],
