@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 
 from typing import Any
@@ -274,3 +275,90 @@ class ParadimeHook(BaseHook):
         Path(output_file_path).write_text(response.text)
 
         return output_file_path.as_posix()
+
+    def get_workspaces(self) -> Any:
+        query = """
+            query listWorkspaces{
+                listWorkspaces{
+                    workspaces{
+                        name
+                        uid
+                    }
+                }
+            }
+        """
+        response_json = self._call_gql(query=query, variables={})["listWorkspaces"]
+        return response_json["workspaces"]
+    
+    def get_active_users(self) -> Any:
+        query = """
+            query listActiveUsers {
+                listUsers{
+                    activeUsers{
+                        uid
+                        email
+                        name
+                        accountType
+                    }
+                }
+            }
+        """
+
+        response_json = self._call_gql(query=query, variables={})["listUsers"]
+
+        return response_json["activeUsers"]
+    
+    def get_invited_users(self) -> Any:
+        query = """
+            query listInvitedUsers {
+                listUsers{
+                    invitedUsers{
+                        email
+                        accountType
+                        inviteStatus
+                    }
+                }
+            }
+        """
+
+        response_json = self._call_gql(query=query, variables={})["listUsers"]
+        
+        return response_json["invitedUsers"]
+    
+    class UserAccountType(Enum):
+        ADMIN = "ADMIN"
+        DEVELOPER = "DEVELOPER"
+        BUSINESS = "BUSINESS"
+
+    def invite_user(self, email: str, account_type: UserAccountType) -> None:
+        query = """
+            mutation inviteUser($email: String!, $accountType: UserAccountType!) {
+                inviteUser(email: $email, accountType: $accountType){
+                    ok
+                }
+            }
+        """
+
+        self._call_gql(query=query, variables={"email": email, "accountType": account_type.value})
+    
+    def update_user_account_type(self, uid: str, account_type: UserAccountType) -> None:
+        query = """
+            mutation updateUserAccountType($uid: String!, $accountType: UserAccountType!) {
+                updateUserAccountType(uid: $uid, accountType: $accountType){
+                    ok
+                }
+            }
+        """
+
+        self._call_gql(query=query, variables={"uid": uid, "accountType": account_type.value})
+    
+    def disable_user(self, uid: str) -> None:
+        query = """
+            mutation disableUser($uid: String!) {
+                disableUser(uid: $uid){
+                    ok
+                }
+            }
+        """
+
+        self._call_gql(query=query, variables={"uid": uid})
