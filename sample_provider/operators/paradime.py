@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pathlib import Path
 
 from typing import TYPE_CHECKING
 
@@ -31,3 +32,60 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
     def execute(self, context: Context) -> int:
         run_id = self.hook.trigger_schedule_run(schedule_name=self.schedule_name)
         return run_id
+
+class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
+    """
+    Downloads the artifact from a Paradime Bolt dbt schedule run.
+
+    :param conn_id: The Airflow connection id to use when connecting to Paradime.
+    :param run_id: The schedule run id to download the artifact from.
+    :path artifact_path: The path to download the artifact to. Example: target/manifest.json
+    :param command_index: Optional. The index of the command to download the artifact from. Defaults to searching from the last command up to the first, and returning the first artifact found.
+    :param output_file_name: Optional. The name of the file to download the artifact to. Defaults to the <run_id>_<artifact_file_name>. Example: 42_manifest.json
+    """
+
+    template_fields = ["run_id", "output_file_name"]
+
+    def __init__(
+        self,
+        *,
+        conn_id: str,
+        run_id: int,
+        artifact_path: str,
+        command_index: int | None = None,
+        output_file_name: str | None = None,
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.hook = ParadimeHook(conn_id=conn_id)
+        self.run_id = run_id
+        self.artifact_path = artifact_path
+        self.command_index = command_index
+        self.output_file_name = Path(output_file_name) if output_file_name else None
+
+    def execute(self, context: Context) -> str:
+        
+        run_commands = self.hook.get_bolt_run_commands(run_id=self.run_id)
+        commands_to_search = []
+        if self.command_index is None:
+            commands_to_search = run_commands[::-1]
+        else:
+            if len(commands_to_search) <= self.command_index:
+                raise ValueError(f"command_index {self.command_index!r} is out of range for run_id {self.run_id}. There are only {len(run_commands)} commands.")
+            
+            commands_to_search = [run_commands[self.command_index]]
+        
+        artifact_id = self.hook.get_artifact_from_commands(commands=commands_to_search, artifact_path=self.artifact_path)
+        if artifact_id is None:
+            raise ValueError(f"Could not find artifact {self.artifact_path!r}")
+        
+        artifact_url = self.hook.get_artifact_url(artifact_id=artifact_id)
+
+        if self.output_file_name is None:
+            self.output_file_name = Path(f"{self.run_id}_{Path(self.artifact_path).name}")
+
+        self.log.info(f"Downloading artifact {self.artifact_path!r} from run {self.run_id!r} to {self.output_file_name.absolute().as_posix()!r}")
+
+        self.hook.download_artifact(artifact_url=artifact_url, file_name=self.output_file_name)
+
+        return self.output_file_name.absolute().as_posix()

@@ -22,6 +22,7 @@ hooks:
 
 operators:
   - module: sample_provider.operators.paradime.ParadimeBoltDbtScheduleRunOperator
+  - module: sample_provider.operators.paradime.ParadimeBoltDbtScheduleRunArtifactOperator
 
 sensors:
   - module: sample_provider.sensors.paradime.ParadimeBoltDbtScheduleRunSensor

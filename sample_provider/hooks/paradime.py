@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from pathlib import Path
 
 from typing import Any
 
@@ -118,3 +119,96 @@ class ParadimeHook(BaseHook):
         state = response.json()["data"]["boltRunStatus"]["state"]
 
         return state
+
+    @dataclass
+    class BoltCommand:
+        id: int
+        command: str
+
+    def get_bolt_run_commands(self, run_id: int) -> list[BoltCommand]:
+        query = """
+            query boltRunStatus($runId: Int!) {
+                boltRunStatus(runId: $runId) {
+                    commands {
+                        id
+                        command
+                    }
+                }
+            }
+        """
+
+        response = requests.post(
+            url=self.get_api_endpoint(),
+            json={"query": query, "variables": {"runId": int(run_id)}}, 
+            headers=self.get_request_headers(),
+        )
+        self._raise_for_errors(response)
+
+        commands = [self.BoltCommand(id=command["id"], command=command["command"]) for command in response.json()["data"]["boltRunStatus"]["commands"]]
+
+        return sorted(commands, key=lambda command: command.id)
+    
+    def get_artifact_from_command(self, command: BoltCommand, artifact_path: str) -> int | None:
+        self.log.info(f"Searching for artifact {artifact_path!r} in command {command.id!r} - {command.command!r}")
+
+        query = """
+            query BoltCommand($commandId: Int!) {
+                boltCommand(commandId: $commandId) {
+                    resources {
+                        id
+                        path
+                    }
+                }
+            }
+        """
+
+        response = requests.post(
+            url=self.get_api_endpoint(),
+            json={"query": query, "variables": {"commandId": int(command.id)}}, 
+            headers=self.get_request_headers(),
+        )
+        self._raise_for_errors(response)
+
+        resources = response.json()["data"]["boltCommand"]["resources"]
+        for resource in resources:
+            if resource["path"] == artifact_path:
+                self.log.info(f"Found artifact {artifact_path!r} in command {command.id!r} - {command.command!r}")
+                return resource["id"]
+
+        self.log.info(f"Could not find artifact {artifact_path!r} in command {command.id!r} - {command.command!r}")
+
+        return None
+
+    def get_artifact_from_commands(self, artifact_path: str, commands: list[BoltCommand]) -> int | None:
+        for command in commands:
+            artifact_id = self.get_artifact_from_command(command=command, artifact_path=artifact_path)
+            if artifact_id is not None:
+                return artifact_id
+
+        return None
+    
+    def get_artifact_url(self, artifact_id: int) -> str:
+        query = """
+            query BoltResourceUrl($resourceId: Int!) {
+                boltResourceUrl(resourceId: $resourceId) {
+                    ok
+                    url
+                }
+            }
+        """
+
+        response = requests.post(
+            url=self.get_api_endpoint(),
+            json={"query": query, "variables": {"resourceId": int(artifact_id)}}, 
+            headers=self.get_request_headers(),
+        )
+        self._raise_for_errors(response)
+
+        url = response.json()["data"]["boltResourceUrl"]["url"]
+        return url
+
+    def download_artifact(self, artifact_url: str, file_name: str) -> None:
+        response = requests.get(url=artifact_url)
+        response.raise_for_status()
+
+        Path(file_name).write_text(response.text)
