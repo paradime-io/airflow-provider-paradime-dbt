@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from airflow.sensors.base import BaseSensorOperator
+from airflow.sensors.base import BaseSensorOperator  # type: ignore
 
 from paradime_dbt_provider.hooks.paradime import ParadimeHook
 
 if TYPE_CHECKING:
-    from airflow.utils.context import Context
+    from airflow.utils.context import Context  # type: ignore
 
 
 class ParadimeBoltDbtScheduleRunSensor(BaseSensorOperator):
@@ -46,4 +46,3 @@ class ParadimeBoltDbtScheduleRunSensor(BaseSensorOperator):
         self.log.info(f"State of run {self.run_id!r} is {state!r}. {more_info}")
 
         return state == "SUCCESS"
-

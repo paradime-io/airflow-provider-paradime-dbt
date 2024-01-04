@@ -1,25 +1,54 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-
 from typing import Any
 
-from airflow.hooks.base import BaseHook
 import requests
+from airflow.hooks.base import BaseHook  # type: ignore[import]
+
+
+@dataclass
+class BoltSchedule:
+    name: str
+    commands: list[str]
+    schedule: str
+    uuid: str
+    source: str
+    owner: str
+    latest_run_id: int | None
+
+
+@dataclass
+class BoltCommand:
+    id: int
+    command: str
+    start_dttm: str
+    end_dttm: str
+    stdout: str
+    stderr: str
+    return_code: int | None
+
+
+@dataclass
+class BoltResource:
+    id: int
+    path: str
 
 
 class ParadimeHook(BaseHook):
     conn_name_attr = "conn_id"
-    default_conn_name = "paradime_conn_default" 
+    default_conn_name = "paradime_conn_default"
     conn_type = "paradime"
     hook_name = "Paradime"
 
     @staticmethod
     def get_connection_form_widgets() -> dict[str, Any]:
-        from flask_appbuilder.fieldwidgets import BS3PasswordFieldWidget, BS3TextFieldWidget
-        from flask_babel import lazy_gettext
-        from wtforms import PasswordField, StringField
+        # Third party modules
+        from flask_appbuilder.fieldwidgets import BS3PasswordFieldWidget, BS3TextFieldWidget  # type: ignore[import]
+        from flask_babel import lazy_gettext  # type: ignore[import]
+        from wtforms import PasswordField, StringField  # type: ignore[import]
 
         return {
             "api_endpoint": StringField(lazy_gettext("API Endpoint"), widget=BS3TextFieldWidget()),
@@ -29,7 +58,6 @@ class ParadimeHook(BaseHook):
 
     @staticmethod
     def get_ui_field_behaviour() -> dict:
-
         return {
             "hidden_fields": ["port", "password", "login", "schema", "extra", "host"],
             "relabeling": {},
@@ -61,10 +89,10 @@ class ParadimeHook(BaseHook):
             api_key=extra["api_key"],
             api_secret=extra["api_secret"],
         )
-    
+
     def _get_api_endpoint(self) -> str:
         return self._get_auth_config().api_endpoint
-    
+
     def _get_request_headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
@@ -91,20 +119,11 @@ class ParadimeHook(BaseHook):
             url=self._get_api_endpoint(),
             json={"query": query, "variables": variables},
             headers=self._get_request_headers(),
+            timeout=60,
         )
         self._raise_for_errors(response)
 
         return response.json()["data"]
-
-    @dataclass
-    class BoltSchedule:
-        name: str
-        commands: list[str]
-        schedule: str
-        uuid: str
-        source: str
-        owner: str
-        latest_run_id: int | None
 
     def get_bolt_schedule(self, schedule_name: str) -> BoltSchedule:
         query = """
@@ -143,9 +162,8 @@ class ParadimeHook(BaseHook):
             }
         """
         response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name, "commands": commands})["triggerBoltRun"]
-        
-        return response_json["runId"]
 
+        return response_json["runId"]
 
     def get_bolt_run_status(self, run_id: int) -> str:
         query = """
@@ -157,23 +175,8 @@ class ParadimeHook(BaseHook):
         """
 
         response_json = self._call_gql(query=query, variables={"runId": int(run_id)})["boltRunStatus"]
-        
-        return response_json["state"]
 
-    @dataclass
-    class BoltCommand:
-        id: int
-        command: str
-        start_dttm: str
-        end_dttm: str
-        stdout: str
-        stderr: str
-        return_code: int | None
-    
-    @dataclass
-    class BoltResource:
-        id: int
-        path: str
+        return response_json["state"]
 
     def get_bolt_run_commands(self, run_id: int) -> list[BoltCommand]:
         query = """
@@ -194,20 +197,22 @@ class ParadimeHook(BaseHook):
 
         response_json = self._call_gql(query=query, variables={"runId": int(run_id)})["boltRunStatus"]
 
-        commands: list[self.BoltCommand] = []
+        commands: list[BoltCommand] = []
         for command_json in response_json["commands"]:
-            commands.append(self.BoltCommand(
-                id=command_json["id"],
-                command=command_json["command"],
-                start_dttm=command_json["startDttm"],
-                end_dttm=command_json["endDttm"],
-                stdout=command_json["stdout"],
-                stderr=command_json["stderr"],
-                return_code=command_json["returnCode"],
-            ))
+            commands.append(
+                BoltCommand(
+                    id=command_json["id"],
+                    command=command_json["command"],
+                    start_dttm=command_json["startDttm"],
+                    end_dttm=command_json["endDttm"],
+                    stdout=command_json["stdout"],
+                    stderr=command_json["stderr"],
+                    return_code=command_json["returnCode"],
+                )
+            )
 
         return sorted(commands, key=lambda command: command.id)
-    
+
     def get_artifacts_from_command(self, command_id: int) -> list[BoltResource]:
         query = """
             query boltCommand($commandId: Int!) {
@@ -222,12 +227,14 @@ class ParadimeHook(BaseHook):
 
         response_json = self._call_gql(query=query, variables={"commandId": int(command_id)})["boltCommand"]
 
-        artifacts: list[self.BoltResource] = []
+        artifacts: list[BoltResource] = []
         for artifact_json in response_json["resources"]:
-            artifacts.append(self.BoltResource(
-                id=artifact_json["id"],
-                path=artifact_json["path"],
-            ))
+            artifacts.append(
+                BoltResource(
+                    id=artifact_json["id"],
+                    path=artifact_json["path"],
+                )
+            )
 
         return artifacts
 
@@ -235,10 +242,10 @@ class ParadimeHook(BaseHook):
         artifacts = self.get_artifacts_from_command(command_id=command_id)
         for artifact in artifacts:
             if artifact.path == artifact_path:
-                return artifact.id
+                return artifact
 
         return None
-    
+
     def get_artifact_download_url(self, artifact_id: int) -> str:
         query = """
             query boltResourceUrl($resourceId: Int!) {
@@ -250,9 +257,9 @@ class ParadimeHook(BaseHook):
         """
 
         response_json = self._call_gql(query=query, variables={"resourceId": int(artifact_id)})["boltResourceUrl"]
-        
+
         return response_json["url"]
-    
+
     def cancel_bolt_run(self, run_id) -> None:
         query = """
             mutation CancelBoltRun($runId: Int!) {
@@ -267,7 +274,7 @@ class ParadimeHook(BaseHook):
 
     def download_artifact(self, artifact_id: int, output_file_name: str) -> str:
         artifact_url = self.get_artifact_download_url(artifact_id=artifact_id)
-        response = requests.get(url=artifact_url)
+        response = requests.get(url=artifact_url, timeout=300)
         response.raise_for_status()
 
         output_file_path = Path(output_file_name).absolute()
@@ -289,7 +296,7 @@ class ParadimeHook(BaseHook):
         """
         response_json = self._call_gql(query=query, variables={})["listWorkspaces"]
         return response_json["workspaces"]
-    
+
     def get_active_users(self) -> Any:
         query = """
             query listActiveUsers {
@@ -307,7 +314,7 @@ class ParadimeHook(BaseHook):
         response_json = self._call_gql(query=query, variables={})["listUsers"]
 
         return response_json["activeUsers"]
-    
+
     def get_invited_users(self) -> Any:
         query = """
             query listInvitedUsers {
@@ -322,9 +329,9 @@ class ParadimeHook(BaseHook):
         """
 
         response_json = self._call_gql(query=query, variables={})["listUsers"]
-        
+
         return response_json["invitedUsers"]
-    
+
     class UserAccountType(Enum):
         ADMIN = "ADMIN"
         DEVELOPER = "DEVELOPER"
@@ -340,7 +347,7 @@ class ParadimeHook(BaseHook):
         """
 
         self._call_gql(query=query, variables={"email": email, "accountType": account_type.value})
-    
+
     def update_user_account_type(self, uid: str, account_type: UserAccountType) -> None:
         query = """
             mutation updateUserAccountType($uid: String!, $accountType: UserAccountType!) {
@@ -351,7 +358,7 @@ class ParadimeHook(BaseHook):
         """
 
         self._call_gql(query=query, variables={"uid": uid, "accountType": account_type.value})
-    
+
     def disable_user(self, uid: str) -> None:
         query = """
             mutation disableUser($uid: String!) {
