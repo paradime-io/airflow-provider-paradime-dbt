@@ -30,7 +30,7 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         self.hook = ParadimeHook(conn_id=conn_id)
 
     def execute(self, context: Context) -> int:
-        run_id = self.hook.trigger_schedule_run(schedule_name=self.schedule_name)
+        run_id = self.hook.trigger_bolt_run(schedule_name=self.schedule_name)
         return run_id
 
 class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
@@ -64,28 +64,31 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
         self.output_file_name = Path(output_file_name) if output_file_name else None
 
     def execute(self, context: Context) -> str:
-        
         run_commands = self.hook.get_bolt_run_commands(run_id=self.run_id)
+        
         commands_to_search = []
         if self.command_index is None:
             commands_to_search = run_commands[::-1]
         else:
             if len(commands_to_search) <= self.command_index:
-                raise ValueError(f"command_index {self.command_index!r} is out of range for run_id {self.run_id}. There are only {len(run_commands)} commands.")
+                raise Exception(f"command_index {self.command_index!r} is out of range for run_id {self.run_id}. There are only {len(run_commands)} commands.")
             
             commands_to_search = [run_commands[self.command_index]]
         
-        artifact_id = self.hook.get_artifact_from_commands(commands=commands_to_search, artifact_path=self.artifact_path)
+        artifact_id = None
+        for command in commands_to_search:
+            artifact_id = self.hook.get_artifact_from_command_by_path(command_id=command.id, artifact_path=self.artifact_path)
+            if artifact_id is not None:
+                break
+
         if artifact_id is None:
-            raise ValueError(f"Could not find artifact {self.artifact_path!r}")
-        
-        artifact_url = self.hook.get_artifact_url(artifact_id=artifact_id)
+            raise Exception(f"Artifact {self.artifact_path!r} not found.")
 
         if self.output_file_name is None:
             self.output_file_name = Path(f"{self.run_id}_{Path(self.artifact_path).name}")
 
-        self.log.info(f"Downloading artifact {self.artifact_path!r} from run {self.run_id!r} to {self.output_file_name.absolute().as_posix()!r}")
+        output_file_path = self.hook.download_artifact(artifact_id=artifact_id, output_file_name=self.output_file_name)
 
-        self.hook.download_artifact(artifact_url=artifact_url, file_name=self.output_file_name)
+        self.log.info(f"Downloaded artifact {self.artifact_path!r} from run {self.run_id!r} to {output_file_path!r}")
 
-        return self.output_file_name.absolute().as_posix()
+        return output_file_path

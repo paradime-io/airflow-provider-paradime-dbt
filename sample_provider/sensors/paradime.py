@@ -32,9 +32,9 @@ class ParadimeBoltDbtScheduleRunSensor(BaseSensorOperator):
         self.run_id = run_id
 
     def poke(self, context: Context) -> bool:
-        state = self.hook.get_schedule_run_status(self.run_id)
+        state = self.hook.get_bolt_run_status(self.run_id)
 
-        more_info = f"More details can be found at https://app.paradime.io/bolt/run_id/{self.run_id}"
+        more_info = f"More details at: https://app.paradime.io/bolt/run_id/{self.run_id}"
 
         if state == "FAILED":
             raise Exception(f"Run {self.run_id!r} has failed. {more_info}")

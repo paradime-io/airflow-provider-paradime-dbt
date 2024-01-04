@@ -52,7 +52,7 @@ class ParadimeHook(BaseHook):
         api_key: str
         api_secret: str
 
-    def get_auth_config(self) -> AuthConfig:
+    def _get_auth_config(self) -> AuthConfig:
         conn = self.get_connection(self.conn_id)
         extra = conn.extra_dejson
         return self.AuthConfig(
@@ -61,14 +61,14 @@ class ParadimeHook(BaseHook):
             api_secret=extra["api_secret"],
         )
     
-    def get_api_endpoint(self) -> str:
-        return self.get_auth_config().api_endpoint
+    def _get_api_endpoint(self) -> str:
+        return self._get_auth_config().api_endpoint
     
-    def get_request_headers(self) -> dict[str, str]:
+    def _get_request_headers(self) -> dict[str, str]:
         return {
             "Content-Type": "application/json",
-            "X-API-KEY": self.get_auth_config().api_key,
-            "X-API-SECRET": self.get_auth_config().api_secret,
+            "X-API-KEY": self._get_auth_config().api_key,
+            "X-API-SECRET": self._get_auth_config().api_secret,
         }
 
     def _raise_for_gql_errors(self, request: requests.Response) -> None:
@@ -80,27 +80,68 @@ class ParadimeHook(BaseHook):
         response.raise_for_status()
         self._raise_for_gql_errors(response)
 
-    def trigger_schedule_run(self, schedule_name: str) -> int:
+    def _call_gql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
+        response = requests.post(
+            url=self._get_api_endpoint(),
+            json={"query": query, "variables": variables},
+            headers=self._get_request_headers(),
+        )
+        self._raise_for_errors(response)
+
+        return response.json()["data"]
+
+    @dataclass
+    class BoltSchedule:
+        name: str
+        commands: list[str]
+        schedule: str
+        uuid: str
+        source: str
+        owner: str
+        latest_run_id: int | None
+
+    def get_bolt_schedule(self, schedule_name: str) -> BoltSchedule:
         query = """
-            mutation trigger($scheduleName: String!) {
-                triggerBoltRun(scheduleName: $scheduleName){
-                    runId
+            query boltScheduleName($scheduleName: String!) {
+                boltScheduleName(scheduleName: $scheduleName) {
+                    ok
+                    latestRunId
+                    commands
+                    owner
+                    schedule
+                    uuid
+                    source
                 }
             }
         """
 
-        response = requests.post(
-            url=self.get_api_endpoint(),
-            json={"query": query, "variables": {"scheduleName": schedule_name}},
-            headers=self.get_request_headers(),
+        response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name})["boltScheduleName"]
+
+        return self.BoltSchedule(
+            name=schedule_name,
+            commands=response_json["commands"],
+            schedule=response_json["schedule"],
+            uuid=response_json["uuid"],
+            source=response_json["source"],
+            owner=response_json["owner"],
+            latest_run_id=response_json["latestRunId"],
         )
-        self._raise_for_errors(response)
 
-        run_id = response.json()["data"]["triggerBoltRun"]["runId"]
+    def trigger_bolt_run(self, schedule_name: str, commands: list[str] | None = None) -> int:
+        query = """
+            mutation triggerBoltRun($scheduleName: String!, $commands: [String!]) {
+                triggerBoltRun(scheduleName: $scheduleName, commands: $commands){
+                    ok
+                    runId
+                }
+            }
+        """
+        response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name, "commands": commands})["triggerBoltRun"]
+        
+        return response_json["runId"]
 
-        return run_id
 
-    def get_schedule_run_status(self, run_id: int) -> str:
+    def get_bolt_run_status(self, run_id: int) -> str:
         query = """
             query boltRunStatus($runId: Int!) {
                 boltRunStatus(runId: $runId) {
@@ -109,21 +150,24 @@ class ParadimeHook(BaseHook):
             }
         """
 
-        response = requests.post(
-            url=self.get_api_endpoint(),
-            json={"query": query, "variables": {"runId": int(run_id)}}, 
-            headers=self.get_request_headers(),
-        )
-        self._raise_for_errors(response)
-
-        state = response.json()["data"]["boltRunStatus"]["state"]
-
-        return state
+        response_json = self._call_gql(query=query, variables={"runId": int(run_id)})["boltRunStatus"]
+        
+        return response_json["state"]
 
     @dataclass
     class BoltCommand:
         id: int
         command: str
+        start_dttm: str
+        end_dttm: str
+        stdout: str
+        stderr: str
+        return_code: int | None
+    
+    @dataclass
+    class BoltResource:
+        id: int
+        path: str
 
     def get_bolt_run_commands(self, run_id: int) -> list[BoltCommand]:
         query = """
@@ -132,27 +176,35 @@ class ParadimeHook(BaseHook):
                     commands {
                         id
                         command
+                        startDttm
+                        endDttm
+                        stdout
+                        stderr
+                        returnCode
                     }
                 }
             }
         """
 
-        response = requests.post(
-            url=self.get_api_endpoint(),
-            json={"query": query, "variables": {"runId": int(run_id)}}, 
-            headers=self.get_request_headers(),
-        )
-        self._raise_for_errors(response)
+        response_json = self._call_gql(query=query, variables={"runId": int(run_id)})["boltRunStatus"]
 
-        commands = [self.BoltCommand(id=command["id"], command=command["command"]) for command in response.json()["data"]["boltRunStatus"]["commands"]]
+        commands: list[self.BoltCommand] = []
+        for command_json in response_json["commands"]:
+            commands.append(self.BoltCommand(
+                id=command_json["id"],
+                command=command_json["command"],
+                start_dttm=command_json["startDttm"],
+                end_dttm=command_json["endDttm"],
+                stdout=command_json["stdout"],
+                stderr=command_json["stderr"],
+                return_code=command_json["returnCode"],
+            ))
 
         return sorted(commands, key=lambda command: command.id)
     
-    def get_artifact_from_command(self, command: BoltCommand, artifact_path: str) -> int | None:
-        self.log.info(f"Searching for artifact {artifact_path!r} in command {command.id!r} - {command.command!r}")
-
+    def get_artifacts_from_command(self, command_id: int) -> list[BoltResource]:
         query = """
-            query BoltCommand($commandId: Int!) {
+            query boltCommand($commandId: Int!) {
                 boltCommand(commandId: $commandId) {
                     resources {
                         id
@@ -162,34 +214,28 @@ class ParadimeHook(BaseHook):
             }
         """
 
-        response = requests.post(
-            url=self.get_api_endpoint(),
-            json={"query": query, "variables": {"commandId": int(command.id)}}, 
-            headers=self.get_request_headers(),
-        )
-        self._raise_for_errors(response)
+        response_json = self._call_gql(query=query, variables={"commandId": int(command_id)})["boltCommand"]
 
-        resources = response.json()["data"]["boltCommand"]["resources"]
-        for resource in resources:
-            if resource["path"] == artifact_path:
-                self.log.info(f"Found artifact {artifact_path!r} in command {command.id!r} - {command.command!r}")
-                return resource["id"]
+        artifacts: list[self.BoltResource] = []
+        for artifact_json in response_json["resources"]:
+            artifacts.append(self.BoltResource(
+                id=artifact_json["id"],
+                path=artifact_json["path"],
+            ))
 
-        self.log.info(f"Could not find artifact {artifact_path!r} in command {command.id!r} - {command.command!r}")
+        return artifacts
 
-        return None
-
-    def get_artifact_from_commands(self, artifact_path: str, commands: list[BoltCommand]) -> int | None:
-        for command in commands:
-            artifact_id = self.get_artifact_from_command(command=command, artifact_path=artifact_path)
-            if artifact_id is not None:
-                return artifact_id
+    def get_artifact_from_command_by_path(self, command_id: int, artifact_path: str) -> BoltResource | None:
+        artifacts = self.get_artifacts_from_command(command_id=command_id)
+        for artifact in artifacts:
+            if artifact.path == artifact_path:
+                return artifact.id
 
         return None
     
-    def get_artifact_url(self, artifact_id: int) -> str:
+    def get_artifact_download_url(self, artifact_id: int) -> str:
         query = """
-            query BoltResourceUrl($resourceId: Int!) {
+            query boltResourceUrl($resourceId: Int!) {
                 boltResourceUrl(resourceId: $resourceId) {
                     ok
                     url
@@ -197,18 +243,29 @@ class ParadimeHook(BaseHook):
             }
         """
 
-        response = requests.post(
-            url=self.get_api_endpoint(),
-            json={"query": query, "variables": {"resourceId": int(artifact_id)}}, 
-            headers=self.get_request_headers(),
-        )
-        self._raise_for_errors(response)
+        response_json = self._call_gql(query=query, variables={"resourceId": int(artifact_id)})["boltResourceUrl"]
+        
+        return response_json["url"]
+    
+    def cancel_bolt_run(self, run_id) -> None:
+        query = """
+            mutation CancelBoltRun($runId: Int!) {
+                cancelBoltRun(runId: $runId) {
+                    ok
+                    errorLog
+                }
+            }
+        """
 
-        url = response.json()["data"]["boltResourceUrl"]["url"]
-        return url
+        self._call_gql(query=query, variables={"runId": int(run_id)})
 
-    def download_artifact(self, artifact_url: str, file_name: str) -> None:
+    def download_artifact(self, artifact_id: int, output_file_name: str) -> str:
+        artifact_url = self.get_artifact_download_url(artifact_id=artifact_id)
         response = requests.get(url=artifact_url)
         response.raise_for_status()
 
-        Path(file_name).write_text(response.text)
+        output_file_path = Path(output_file_name).absolute()
+
+        Path(output_file_path).write_text(response.text)
+
+        return output_file_path.as_posix()
