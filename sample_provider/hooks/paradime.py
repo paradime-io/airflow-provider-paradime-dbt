@@ -77,7 +77,12 @@ class ParadimeHook(BaseHook):
             raise Exception(f"{response_json['errors']}")
 
     def _raise_for_errors(self, response: requests.Response) -> None:
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            self.log.error(f"Error: {response.status_code} - {response.text}")
+            raise e
+
         self._raise_for_gql_errors(response)
 
     def _call_gql(self, query: str, variables: dict[str, Any]) -> dict[str, Any]:
