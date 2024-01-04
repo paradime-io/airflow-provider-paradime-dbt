@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from airflow.models import BaseOperator
 
-from sample_provider.hooks.paradime import ParadimeHook
+from paradime_dbt_provider.hooks.paradime import ParadimeHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
