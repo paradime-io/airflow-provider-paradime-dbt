@@ -62,9 +62,9 @@ class ParadimeHook(BaseHook):
             "hidden_fields": ["port", "password", "login", "schema", "extra", "host"],
             "relabeling": {},
             "placeholders": {
-                "api_endpoint": "https://api.paradime.io/api/v1/....",
-                "api_key": "You can generate the API key from the Paradime workspace settings...",
-                "api_secret": "You can generate the API secret from the Paradime workspace settings...",
+                "api_endpoint": "Generate API endpoint from Paradime Workspace settings.",
+                "api_key": "Generate API key from Paradime Workspace settings.",
+                "api_secret": "Generate API secret from Paradime Workspace settings.",
             },
         }
 
