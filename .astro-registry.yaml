@@ -9,7 +9,7 @@ package-name: airflow-provider-paradime-dbt
 display-name: Paradime
 # URL where users should find the documentation for the provider. This could be a link to the README,
 # an external docs site, etc.
-docs_url: https://docs.paradime.io/
+docs_url: https://docs.paradime.io/app-help/bolt-scheduler/integrate-bolt-with-other-orchestration-tools/airflow
 
 # The next sections should be organized by module type (e.g. operators, hooks, functions, decorators, etc.).
 #
