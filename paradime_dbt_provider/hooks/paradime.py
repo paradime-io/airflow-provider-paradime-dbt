@@ -100,8 +100,8 @@ class ParadimeHook(BaseHook):
             "X-API-SECRET": self._get_auth_config().api_secret,
         }
 
-    def _raise_for_gql_errors(self, request: requests.Response) -> None:
-        response_json = request.json()
+    def _raise_for_gql_errors(self, response: requests.Response) -> None:
+        response_json = response.json()
         if "errors" in response_json:
             raise Exception(f"{response_json['errors']}")
 
@@ -110,7 +110,7 @@ class ParadimeHook(BaseHook):
             response.raise_for_status()
         except Exception as e:
             self.log.error(f"Error: {response.status_code} - {response.text}")
-            raise e
+            raise Exception(f"Error: {response.status_code} - {response.text}") from e
 
         self._raise_for_gql_errors(response)
 
