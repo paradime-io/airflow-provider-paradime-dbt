@@ -9,7 +9,7 @@ from paradime_dbt_provider.hooks.paradime import ParadimeHook, UserAccountType
 
 logger = logging.getLogger(__name__)
 
-PARADIME_CONN_ID = "paradime_conn"  # Update this to your connection id
+PARADIME_CONN_ID = "your_paradime_conn_id"  # Update this to your connection id
 
 
 def manage_users(conn_id: str):

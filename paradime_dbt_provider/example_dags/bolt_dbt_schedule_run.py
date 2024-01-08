@@ -3,7 +3,7 @@ from airflow.decorators import dag  # type: ignore[import]
 from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunArtifactOperator, ParadimeBoltDbtScheduleRunOperator
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
 
-PARADIME_CONN_ID = "paradime_conn"  # Update this to your connection id
+PARADIME_CONN_ID = "your_paradime_conn_id"  # Update this to your connection id
 BOLT_SCHEDULE_NAME = "your_schedule_name"  # Update this to your schedule name
 
 
