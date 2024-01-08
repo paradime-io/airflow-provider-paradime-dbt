@@ -1,4 +1,4 @@
-from airflow.decorators import dag
+from airflow.decorators import dag  # type: ignore[import]
 
 from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunArtifactOperator, ParadimeBoltDbtScheduleRunOperator
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor

@@ -1,13 +1,14 @@
 # Third party modules
 import logging
 
-from airflow.decorators import dag
-from airflow.operators.python import PythonOperator
+from airflow.decorators import dag  # type: ignore[import]
+from airflow.operators.python import PythonOperator  # type: ignore[import]
 
 # First party modules
 from paradime_dbt_provider.hooks.paradime import ParadimeHook, UserAccountType
 
 logger = logging.getLogger(__name__)
+
 
 def manage_users(conn_id: str):
     paradime_hook = ParadimeHook(conn_id=conn_id)

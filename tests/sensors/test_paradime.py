@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from airflow.utils.context import Context
+from airflow.utils.context import Context  # type: ignore[import]
 
 from paradime_dbt_provider.hooks.paradime import ParadimeException
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
