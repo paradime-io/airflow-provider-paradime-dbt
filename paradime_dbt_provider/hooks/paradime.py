@@ -142,7 +142,7 @@ class ParadimeHook(BaseHook):
 
         response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name})["boltScheduleName"]
 
-        return self.BoltSchedule(
+        return BoltSchedule(
             name=schedule_name,
             commands=response_json["commands"],
             schedule=response_json["schedule"],

@@ -72,7 +72,7 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
         if self.command_index is None:
             commands_to_search = run_commands[::-1]
         else:
-            if len(commands_to_search) <= self.command_index:
+            if len(run_commands) <= self.command_index:
                 raise Exception(f"command_index {self.command_index!r} is out of range for run_id {self.run_id}. There are only {len(run_commands)} commands.")
 
             commands_to_search = [run_commands[self.command_index]]
