@@ -6,7 +6,19 @@ from unittest.mock import MagicMock, Mock, patch
 import requests
 
 # First party modules
-from paradime_dbt_provider.hooks.paradime import ActiveUser, BoltResource, InvitedUser, ParadimeException, ParadimeHook, UserAccountType, Workspace
+from paradime_dbt_provider.hooks.paradime import (
+    ActiveUser,
+    BoltDeferredSchedule,
+    BoltResource,
+    BoltRunState,
+    BoltSchedule,
+    BoltSchedules,
+    InvitedUser,
+    ParadimeException,
+    ParadimeHook,
+    UserAccountType,
+    Workspace,
+)
 
 
 class TestParadimeHook(unittest.TestCase):
@@ -542,6 +554,93 @@ class TestParadimeHook(unittest.TestCase):
 
         # Assert
         mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"uid": uid})
+
+    def test_list_bolt_schedules(self):
+        # Mock
+        offset = 0
+        limit = 10
+        show_inactive = False
+        expected_response = {
+            "listBoltSchedules": {
+                "schedules": [
+                    {
+                        "name": "Schedule1",
+                        "schedule": "*/5 * * * *",
+                        "owner": "owner1",
+                        "lastRunAt": "2024-01-01 00:00:00",
+                        "lastRunState": "SUCCESS",
+                        "nextRunAt": "2024-01-01 00:05:00",
+                        "id": 1,
+                        "uuid": "uuid1",
+                        "source": "source1",
+                        "deferredSchedule": {
+                            "enabled": True,
+                            "deferredScheduleName": "DeferredSchedule1",
+                            "successfulRunOnly": True,
+                        },
+                        "turboCi": {
+                            "enabled": True,
+                            "deferredScheduleName": "TurboCi1",
+                            "successfulRunOnly": True,
+                        },
+                        "commands": ["cmd1", "cmd2"],
+                        "gitBranch": "main",
+                        "slackOn": ["failed"],
+                        "slackNotify": ["@john"],
+                        "emailOn": ["failed"],
+                        "emailNotify": ["john@example.com"],
+                    },
+                ],
+                "totalCount": 1,
+            }
+        }
+        self.hook._call_gql = Mock(return_value=expected_response)
+
+        # Call
+        result = self.hook.list_bolt_schedules(offset=offset, limit=limit, show_inactive=show_inactive)
+
+        # Assert
+        self.hook._call_gql.assert_called_once_with(
+            query=unittest.mock.ANY,
+            variables={"offset": offset, "limit": limit, "showInactive": show_inactive},
+        )
+
+        self.assertEqual(len(result.schedules), 1)
+        self.assertEqual(
+            result,
+            BoltSchedules(
+                schedules=[
+                    BoltSchedule(
+                        name="Schedule1",
+                        schedule="*/5 * * * *",
+                        owner="owner1",
+                        last_run_at="2024-01-01 00:00:00",
+                        last_run_state=BoltRunState.SUCCESS,
+                        next_run_at="2024-01-01 00:05:00",
+                        id=1,
+                        uuid="uuid1",
+                        source="source1",
+                        deferred_schedule=BoltDeferredSchedule(
+                            enabled=True,
+                            deferred_schedule_name="DeferredSchedule1",
+                            successful_run_only=True,
+                        ),
+                        turbo_ci=BoltDeferredSchedule(
+                            enabled=True,
+                            deferred_schedule_name="TurboCi1",
+                            successful_run_only=True,
+                        ),
+                        commands=["cmd1", "cmd2"],
+                        git_branch="main",
+                        slack_on=["failed"],
+                        slack_notify=["@john"],
+                        email_on=["failed"],
+                        email_notify=["john@example.com"],
+                    ),
+                ],
+                total_count=1,
+            ),
+        )
 
 
 if __name__ == "__main__":

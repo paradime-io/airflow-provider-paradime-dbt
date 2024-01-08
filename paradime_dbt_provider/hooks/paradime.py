@@ -13,8 +13,58 @@ class ParadimeException(Exception):
     pass
 
 
+class BoltRunState(Enum):
+    RUNNING = "RUNNING"
+    SUCCESS = "SUCCESS"
+    ERROR = "ERROR"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+    SKIPPED = "SKIPPED"
+
+    @classmethod
+    def from_str(cls, value: str) -> BoltRunState | None:
+        try:
+            return BoltRunState(value)
+        except ValueError:
+            return None
+
+
+@dataclass
+class BoltDeferredSchedule:
+    enabled: bool
+    deferred_schedule_name: str | None
+    successful_run_only: bool
+
+
 @dataclass
 class BoltSchedule:
+    name: str
+    schedule: str
+    owner: str
+    last_run_at: str | None
+    last_run_state: BoltRunState | None
+    next_run_at: str | None
+    id: int
+    uuid: str
+    source: str
+    deferred_schedule: BoltDeferredSchedule | None
+    turbo_ci: BoltDeferredSchedule | None
+    commands: list[str]
+    git_branch: str | None
+    slack_on: list[str]
+    slack_notify: list[str]
+    email_on: list[str]
+    email_notify: list[str]
+
+
+@dataclass
+class BoltSchedules:
+    schedules: list[BoltSchedule]
+    total_count: int
+
+
+@dataclass
+class BoltScheduleInfo:
     name: str
     commands: list[str]
     schedule: str
@@ -177,7 +227,94 @@ class ParadimeHook(BaseHook):
 
         return response.json()["data"]
 
-    def get_bolt_schedule(self, schedule_name: str) -> BoltSchedule:
+    def list_bolt_schedules(self, offset: int, limit: int, show_inactive: bool = False) -> BoltSchedules:
+        """
+        Get a list of Bolt schedules. The list is paginated. The total count of schedules is also returned.
+        Use the offset and limit parameters to page through the list. Set show_inactive to True to get inactive schedules.
+        """
+
+        query = """
+            query listBoltSchedules($offset: Int!, $limit: Int!, $showInactive: Boolean!) {
+                listBoltSchedules(offset: $offset, limit: $limit, showInactive: $showInactive) {
+                    schedules {
+                        name
+                        schedule
+                        owner
+                        lastRunAt
+                        lastRunState
+                        nextRunAt
+                        id
+                        uuid
+                        source
+                        turboCi {
+                            enabled
+                            deferredScheduleName
+                            successfulRunOnly
+                        }
+                        deferredSchedule {
+                            enabled
+                            deferredScheduleName
+                            successfulRunOnly
+                        }
+                        commands
+                        gitBranch
+                        slackOn
+                        slackNotify
+                        emailOn
+                        emailNotify
+                    }
+                    totalCount
+                }
+            }
+        """
+
+        response_json = self._call_gql(
+            query=query,
+            variables={"offset": offset, "limit": limit, "showInactive": show_inactive},
+        )["listBoltSchedules"]
+
+        schedules: list[BoltSchedule] = []
+        for schedule_json in response_json["schedules"]:
+            schedules.append(
+                BoltSchedule(
+                    name=schedule_json["name"],
+                    schedule=schedule_json["schedule"],
+                    owner=schedule_json["owner"],
+                    last_run_at=schedule_json["lastRunAt"],
+                    last_run_state=BoltRunState.from_str(schedule_json["lastRunState"]),
+                    next_run_at=schedule_json["nextRunAt"],
+                    id=schedule_json["id"],
+                    uuid=schedule_json["uuid"],
+                    source=schedule_json["source"],
+                    deferred_schedule=BoltDeferredSchedule(
+                        enabled=schedule_json["deferredSchedule"]["enabled"],
+                        deferred_schedule_name=schedule_json["deferredSchedule"]["deferredScheduleName"],
+                        successful_run_only=schedule_json["deferredSchedule"]["successfulRunOnly"],
+                    )
+                    if schedule_json["deferredSchedule"]
+                    else None,
+                    turbo_ci=BoltDeferredSchedule(
+                        enabled=schedule_json["turboCi"]["enabled"],
+                        deferred_schedule_name=schedule_json["turboCi"]["deferredScheduleName"],
+                        successful_run_only=schedule_json["turboCi"]["successfulRunOnly"],
+                    )
+                    if schedule_json["turboCi"]
+                    else None,
+                    commands=schedule_json["commands"],
+                    git_branch=schedule_json["gitBranch"],
+                    slack_on=schedule_json["slackOn"],
+                    slack_notify=schedule_json["slackNotify"],
+                    email_on=schedule_json["emailOn"],
+                    email_notify=schedule_json["emailNotify"],
+                )
+            )
+
+        return BoltSchedules(
+            schedules=schedules,
+            total_count=response_json["totalCount"],
+        )
+
+    def get_bolt_schedule(self, schedule_name: str) -> BoltScheduleInfo:
         """
         Get details of a Bolt schedule.
         """
@@ -198,7 +335,7 @@ class ParadimeHook(BaseHook):
 
         response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name})["boltScheduleName"]
 
-        return BoltSchedule(
+        return BoltScheduleInfo(
             name=schedule_name,
             commands=response_json["commands"],
             schedule=response_json["schedule"],
