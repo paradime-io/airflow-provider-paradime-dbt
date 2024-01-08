@@ -57,4 +57,4 @@ run_schedule_and_download_manifest()
 
 ```
 
-Refer to the [example DAGs](./example_dags) in this repository for more examples.
+Refer to the [example DAGs](https://github.com/paradime-io/airflow-provider-paradime-dbt/paradime_dbt_provider/example_dags) in this repository for more examples.
