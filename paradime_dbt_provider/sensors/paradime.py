@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 from airflow.sensors.base import BaseSensorOperator  # type: ignore
 
-from paradime_dbt_provider.hooks.paradime import ParadimeHook
+from paradime_dbt_provider.hooks.paradime import ParadimeException, ParadimeHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context  # type: ignore
@@ -37,11 +37,11 @@ class ParadimeBoltDbtScheduleRunSensor(BaseSensorOperator):
         more_info = f"More details at: https://app.paradime.io/bolt/run_id/{self.run_id}"
 
         if state == "FAILED":
-            raise Exception(f"Run {self.run_id!r} has failed. {more_info}")
+            raise ParadimeException(f"Run {self.run_id!r} has failed. {more_info}")
         elif state == "ERROR":
-            raise Exception(f"Run {self.run_id!r} has error(s). {more_info}")
+            raise ParadimeException(f"Run {self.run_id!r} has error(s). {more_info}")
         elif state == "CANCELED":
-            raise Exception(f"Run {self.run_id!r} was canceled. {more_info}")
+            raise ParadimeException(f"Run {self.run_id!r} was canceled. {more_info}")
 
         self.log.info(f"State of run {self.run_id!r} is {state!r}. {more_info}")
 

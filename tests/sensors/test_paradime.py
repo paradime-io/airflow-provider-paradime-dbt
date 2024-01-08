@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from airflow.utils.context import Context
 
+from paradime_dbt_provider.hooks.paradime import ParadimeException
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
 
 
@@ -39,7 +40,7 @@ class TestParadimeBoltDbtScheduleRunSensor(unittest.TestCase):
         context = MagicMock(spec=Context)
 
         # Call/Assert
-        with self.assertRaises(Exception):
+        with self.assertRaises(ParadimeException):
             self.sensor.poke(context)
 
         self.mock_hook_instance.get_bolt_run_status.assert_called_once_with(self.run_id)
@@ -50,7 +51,7 @@ class TestParadimeBoltDbtScheduleRunSensor(unittest.TestCase):
         context = MagicMock(spec=Context)
 
         # Call/Assert
-        with self.assertRaises(Exception):
+        with self.assertRaises(ParadimeException):
             self.sensor.poke(context)
 
         self.mock_hook_instance.get_bolt_run_status.assert_called_once_with(self.run_id)
@@ -61,7 +62,7 @@ class TestParadimeBoltDbtScheduleRunSensor(unittest.TestCase):
         context = MagicMock(spec=Context)
 
         # Call/Assert
-        with self.assertRaises(Exception):
+        with self.assertRaises(ParadimeException):
             self.sensor.poke(context)
 
         self.mock_hook_instance.get_bolt_run_status.assert_called_once_with(self.run_id)

@@ -9,6 +9,10 @@ import requests
 from airflow.hooks.base import BaseHook  # type: ignore[import]
 
 
+class ParadimeException(Exception):
+    pass
+
+
 @dataclass
 class BoltSchedule:
     name: str
@@ -103,14 +107,14 @@ class ParadimeHook(BaseHook):
     def _raise_for_gql_errors(self, response: requests.Response) -> None:
         response_json = response.json()
         if "errors" in response_json:
-            raise Exception(f"{response_json['errors']}")
+            raise ParadimeException(f"{response_json['errors']}")
 
     def _raise_for_errors(self, response: requests.Response) -> None:
         try:
             response.raise_for_status()
         except Exception as e:
             self.log.error(f"Error: {response.status_code} - {response.text}")
-            raise Exception(f"Error: {response.status_code} - {response.text}") from e
+            raise ParadimeException(f"Error: {response.status_code} - {response.text}") from e
 
         self._raise_for_gql_errors(response)
 

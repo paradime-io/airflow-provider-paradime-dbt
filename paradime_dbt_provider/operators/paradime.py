@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from airflow.models import BaseOperator  # type: ignore[import]
 
-from paradime_dbt_provider.hooks.paradime import ParadimeHook
+from paradime_dbt_provider.hooks.paradime import ParadimeException, ParadimeHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context  # type: ignore
@@ -73,7 +73,7 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
             commands_to_search = run_commands[::-1]
         else:
             if len(run_commands) <= self.command_index:
-                raise Exception(f"command_index {self.command_index!r} is out of range for run_id {self.run_id}. There are only {len(run_commands)} commands.")
+                raise ParadimeException(f"command_index {self.command_index!r} is out of range for run_id {self.run_id}. There are only {len(run_commands)} commands.")
 
             commands_to_search = [run_commands[self.command_index]]
 
@@ -84,7 +84,7 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
                 break
 
         if artifact is None:
-            raise Exception(f"Artifact {self.artifact_path!r} not found.")
+            raise ParadimeException(f"Artifact {self.artifact_path!r} not found.")
 
         if self.output_file_name is None:
             self.output_file_name = f"{self.run_id}_{Path(self.artifact_path).name}"

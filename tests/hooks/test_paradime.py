@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import requests
 
 # First party modules
-from paradime_dbt_provider.hooks.paradime import BoltResource, ParadimeHook
+from paradime_dbt_provider.hooks.paradime import BoltResource, ParadimeException, ParadimeHook
 
 
 class TestParadimeHook(unittest.TestCase):
@@ -80,7 +80,7 @@ class TestParadimeHook(unittest.TestCase):
         mock_response.json.return_value = {"errors": ["Error 1", "Error 2"]}
 
         # Call & Assert
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ParadimeException) as context:
             self.hook._raise_for_gql_errors(mock_response)
 
         self.assertEqual(str(context.exception), "['Error 1', 'Error 2']")
@@ -105,7 +105,7 @@ class TestParadimeHook(unittest.TestCase):
         mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
 
         # Call & Assert
-        with self.assertRaises(Exception) as context:
+        with self.assertRaises(ParadimeException) as context:
             self.hook._raise_for_errors(mock_response)
 
         expected_error_message = "Error: 500 - Internal Server Error"
