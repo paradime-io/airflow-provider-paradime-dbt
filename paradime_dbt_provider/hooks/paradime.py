@@ -41,6 +41,33 @@ class BoltResource:
     path: str
 
 
+class UserAccountType(Enum):
+    ADMIN = "ADMIN"
+    DEVELOPER = "DEVELOPER"
+    BUSINESS = "BUSINESS"
+
+
+@dataclass
+class ActiveUser:
+    uid: str
+    email: str
+    name: str
+    account_type: str
+
+
+@dataclass
+class InvitedUser:
+    email: str
+    account_type: str
+    invite_status: str
+
+
+@dataclass
+class Workspace:
+    name: str
+    uid: str
+
+
 class ParadimeHook(BaseHook):
     conn_name_attr = "conn_id"
     default_conn_name = "paradime_conn_default"
@@ -299,9 +326,19 @@ class ParadimeHook(BaseHook):
             }
         """
         response_json = self._call_gql(query=query, variables={})["listWorkspaces"]
-        return response_json["workspaces"]
 
-    def get_active_users(self) -> Any:
+        workspaces: list[Workspace] = []
+        for workspace_json in response_json["workspaces"]:
+            workspaces.append(
+                Workspace(
+                    name=workspace_json["name"],
+                    uid=workspace_json["uid"],
+                )
+            )
+
+        return workspaces
+
+    def get_active_users(self) -> list[ActiveUser]:
         query = """
             query listActiveUsers {
                 listUsers{
@@ -317,9 +354,20 @@ class ParadimeHook(BaseHook):
 
         response_json = self._call_gql(query=query, variables={})["listUsers"]
 
-        return response_json["activeUsers"]
+        active_users: list[ActiveUser] = []
+        for active_user_json in response_json["activeUsers"]:
+            active_users.append(
+                ActiveUser(
+                    uid=active_user_json["uid"],
+                    email=active_user_json["email"],
+                    name=active_user_json["name"],
+                    account_type=active_user_json["accountType"],
+                )
+            )
 
-    def get_invited_users(self) -> Any:
+        return active_users
+
+    def get_invited_users(self) -> list[InvitedUser]:
         query = """
             query listInvitedUsers {
                 listUsers{
@@ -334,12 +382,17 @@ class ParadimeHook(BaseHook):
 
         response_json = self._call_gql(query=query, variables={})["listUsers"]
 
-        return response_json["invitedUsers"]
+        invited_users: list[InvitedUser] = []
+        for invited_user_json in response_json["invitedUsers"]:
+            invited_users.append(
+                InvitedUser(
+                    email=invited_user_json["email"],
+                    account_type=invited_user_json["accountType"],
+                    invite_status=invited_user_json["inviteStatus"],
+                )
+            )
 
-    class UserAccountType(Enum):
-        ADMIN = "ADMIN"
-        DEVELOPER = "DEVELOPER"
-        BUSINESS = "BUSINESS"
+        return invited_users
 
     def invite_user(self, email: str, account_type: UserAccountType) -> None:
         query = """

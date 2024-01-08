@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import requests
 
 # First party modules
-from paradime_dbt_provider.hooks.paradime import BoltResource, ParadimeException, ParadimeHook
+from paradime_dbt_provider.hooks.paradime import ActiveUser, BoltResource, InvitedUser, ParadimeException, ParadimeHook, UserAccountType, Workspace
 
 
 class TestParadimeHook(unittest.TestCase):
@@ -400,7 +400,13 @@ class TestParadimeHook(unittest.TestCase):
 
         # Assert
         mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={})
-        self.assertEqual(result, expected_response["listWorkspaces"]["workspaces"])
+        self.assertEqual(
+            result,
+            [
+                Workspace(name="Workspace1", uid="uid1"),
+                Workspace(name="Workspace2", uid="uid2"),
+            ],
+        )
 
     @patch.object(ParadimeHook, "_call_gql")
     def test_get_active_users(self, mock_call_gql):
@@ -430,7 +436,23 @@ class TestParadimeHook(unittest.TestCase):
 
         # Assert
         mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={})
-        self.assertEqual(result, expected_response["listUsers"]["activeUsers"])
+        self.assertEqual(
+            result,
+            [
+                ActiveUser(
+                    uid="uid1",
+                    email="user1@example.com",
+                    name="User1",
+                    account_type="ADMIN",
+                ),
+                ActiveUser(
+                    uid="uid2",
+                    email="user2@example.com",
+                    name="User2",
+                    account_type="DEVELOPER",
+                ),
+            ],
+        )
 
     @patch.object(ParadimeHook, "_call_gql")
     def test_get_invited_users(self, mock_call_gql):
@@ -441,12 +463,12 @@ class TestParadimeHook(unittest.TestCase):
                     {
                         "email": "invitee1@example.com",
                         "accountType": "DEVELOPER",
-                        "inviteStatus": "PENDING",
+                        "inviteStatus": "SENT",
                     },
                     {
                         "email": "invitee2@example.com",
                         "accountType": "BUSINESS",
-                        "inviteStatus": "ACCEPTED",
+                        "inviteStatus": "EXPIRED",
                     },
                 ]
             }
@@ -458,13 +480,27 @@ class TestParadimeHook(unittest.TestCase):
 
         # Assert
         mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={})
-        self.assertEqual(result, expected_response["listUsers"]["invitedUsers"])
+        self.assertEqual(
+            result,
+            [
+                InvitedUser(
+                    email="invitee1@example.com",
+                    account_type="DEVELOPER",
+                    invite_status="SENT",
+                ),
+                InvitedUser(
+                    email="invitee2@example.com",
+                    account_type="BUSINESS",
+                    invite_status="EXPIRED",
+                ),
+            ],
+        )
 
     @patch.object(ParadimeHook, "_call_gql")
     def test_invite_user(self, mock_call_gql):
         # Mock
         email = "invitee@example.com"
-        account_type = ParadimeHook.UserAccountType.DEVELOPER
+        account_type = UserAccountType.DEVELOPER
         expected_response = {"inviteUser": {"ok": True}}
         mock_call_gql.return_value = expected_response
 
@@ -481,7 +517,7 @@ class TestParadimeHook(unittest.TestCase):
     def test_update_user_account_type(self, mock_call_gql):
         # Mock
         uid = "user123"
-        account_type = ParadimeHook.UserAccountType.BUSINESS
+        account_type = UserAccountType.BUSINESS
         expected_response = {"updateUserAccountType": {"ok": True}}
         mock_call_gql.return_value = expected_response
 
