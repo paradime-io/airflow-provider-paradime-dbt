@@ -474,7 +474,7 @@ class ParadimeHook(BaseHook):
 
         return response_json["url"]
 
-    def cancel_bolt_run(self, run_id) -> None:
+    def cancel_bolt_run(self, run_id: int) -> None:
         """
         Cancel a Bolt run.
         """
