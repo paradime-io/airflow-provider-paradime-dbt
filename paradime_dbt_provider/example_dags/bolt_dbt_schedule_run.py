@@ -1,28 +1,4 @@
-<p align="center">
-  <a href="https://www.paradime.io">
-        <img alt="Paradime" src="https://app.paradime.io/logo192.png" width="60" />
-    </a>
-</p>
-
-<h1 align="center">
-  airflow-provider-paradime-dbt
-</h1>
-
-
-This is the provider for Paradime to run and manage dbt™ jobs in production. The provider enables interaction with Paradime’s Bolt scheduler and management APIs.
-
-## Usage
-
-### Create a connection
-1. Generate your API key, secret and endpoint from Paradime Workspace settings.
-2. Create a connection in Airflow, as shown below.
-![Create a connection](./images/connection.png)
-
-### Create a DAG
-
-Here is one example:
-```py
-from airflow.decorators import dag
+from airflow.decorators import dag  # type: ignore[import]
 
 from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunArtifactOperator, ParadimeBoltDbtScheduleRunOperator
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
@@ -54,7 +30,3 @@ def run_schedule_and_download_manifest():
 
 
 run_schedule_and_download_manifest()
-
-```
-
-Refer to the [example DAGs](./example_dags) in this repository for more examples.
