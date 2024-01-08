@@ -1,6 +1,3 @@
-# Third party modules
-from datetime import datetime
-
 from airflow.decorators import dag
 
 from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunArtifactOperator, ParadimeBoltDbtScheduleRunOperator
@@ -8,8 +5,7 @@ from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSen
 
 
 @dag(
-    start_date=datetime(2024, 1, 1),
-    default_args={"conn_id": "paradime"},  # Update this to your connection id
+    default_args={"conn_id": "paradime_conn"},  # Update this to your connection id
 )
 def run_schedule_and_download_manifest():
     # Run the schedule and return the run id as the xcom return value
