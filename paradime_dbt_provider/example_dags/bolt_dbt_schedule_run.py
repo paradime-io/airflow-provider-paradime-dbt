@@ -14,14 +14,14 @@ def run_schedule_and_download_manifest():
     # Get the run id from the xcom return value
     run_id = "{{ task_instance.xcom_pull(task_ids='run_schedule') }}"
 
-    # This will wait for the schedule to complete before continuing
+    # Wait for the schedule to complete before continuing
     task_wait_for_schedule = ParadimeBoltDbtScheduleRunSensor(task_id="wait_for_schedule", run_id=run_id)
 
     # Download the manifest.json file from the schedule run and return the path as the xcom return value
     task_download_manifest = ParadimeBoltDbtScheduleRunArtifactOperator(task_id="download_manifest", run_id=run_id, artifact_path="target/manifest.json")
 
     # Get the path to the manifest.json file from the xcom return value
-    output_path = "{{ task_instance.xcom_pull(task_ids='download') }}"
+    output_path = "{{ task_instance.xcom_pull(task_ids='download_manifest') }}"
 
     task_run_schedule >> task_wait_for_schedule >> task_download_manifest
 
