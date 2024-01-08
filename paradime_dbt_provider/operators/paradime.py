@@ -42,7 +42,7 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
     :param conn_id: The Airflow connection id to use when connecting to Paradime.
     :param run_id: The schedule run id to download the artifact from.
     :path artifact_path: The path to download the artifact to. Example: target/manifest.json
-    :param command_index: Optional. The index of the command to download the artifact from. Defaults to searching from the last command up to the first, and returning the first artifact found.
+    :param command_index: Optional. The index of the command to download the artifact from. Defaults to searching from the last command up to the first, and returning the first artifact found. Index starts at 0.
     :param output_file_name: Optional. The name of the file to download the artifact to. Defaults to the <run_id>_<artifact_file_name>. Example: 42_manifest.json
     """
 

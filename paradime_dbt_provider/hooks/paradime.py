@@ -69,6 +69,12 @@ class Workspace:
 
 
 class ParadimeHook(BaseHook):
+    """
+    Interact with Paradime API.
+
+    :param conn_id: The Airflow connection id to use when connecting to Paradime.
+    """
+
     conn_name_attr = "conn_id"
     default_conn_name = "paradime_conn_default"
     conn_type = "paradime"
@@ -76,7 +82,10 @@ class ParadimeHook(BaseHook):
 
     @staticmethod
     def get_connection_form_widgets() -> dict[str, Any]:
-        # Third party modules
+        """
+        Defines connection widgets to add to connection form.
+        """
+
         from flask_appbuilder.fieldwidgets import BS3PasswordFieldWidget, BS3TextFieldWidget  # type: ignore[import]
         from flask_babel import lazy_gettext  # type: ignore[import]
         from wtforms import PasswordField, StringField  # type: ignore[import]
@@ -89,6 +98,10 @@ class ParadimeHook(BaseHook):
 
     @staticmethod
     def get_ui_field_behaviour() -> dict:
+        """
+        Defines custom field behaviour for the connection form.
+        """
+
         return {
             "hidden_fields": ["port", "password", "login", "schema", "extra", "host"],
             "relabeling": {},
@@ -108,11 +121,19 @@ class ParadimeHook(BaseHook):
 
     @dataclass
     class AuthConfig:
+        """
+        Configuration for Paradime authentication.
+        """
+
         api_endpoint: str
         api_key: str
         api_secret: str
 
     def _get_auth_config(self) -> AuthConfig:
+        """
+        Get Paradime authentication configuration from Airflow connection.
+        """
+
         conn = self.get_connection(self.conn_id)
         extra = conn.extra_dejson
         return self.AuthConfig(
@@ -157,6 +178,10 @@ class ParadimeHook(BaseHook):
         return response.json()["data"]
 
     def get_bolt_schedule(self, schedule_name: str) -> BoltSchedule:
+        """
+        Get details of a Bolt schedule.
+        """
+
         query = """
             query boltScheduleName($scheduleName: String!) {
                 boltScheduleName(scheduleName: $scheduleName) {
@@ -184,6 +209,10 @@ class ParadimeHook(BaseHook):
         )
 
     def trigger_bolt_run(self, schedule_name: str, commands: list[str] | None = None) -> int:
+        """
+        Trigger a Bolt run. Returns the run ID.
+        """
+
         query = """
             mutation triggerBoltRun($scheduleName: String!, $commands: [String!]) {
                 triggerBoltRun(scheduleName: $scheduleName, commands: $commands){
@@ -197,6 +226,9 @@ class ParadimeHook(BaseHook):
         return response_json["runId"]
 
     def get_bolt_run_status(self, run_id: int) -> str:
+        """
+        Get the status of a Bolt run.
+        """
         query = """
             query boltRunStatus($runId: Int!) {
                 boltRunStatus(runId: $runId) {
@@ -210,6 +242,10 @@ class ParadimeHook(BaseHook):
         return response_json["state"]
 
     def get_bolt_run_commands(self, run_id: int) -> list[BoltCommand]:
+        """
+        Get the command details of a Bolt run.
+        """
+
         query = """
             query boltRunStatus($runId: Int!) {
                 boltRunStatus(runId: $runId) {
@@ -245,6 +281,10 @@ class ParadimeHook(BaseHook):
         return sorted(commands, key=lambda command: command.id)
 
     def get_artifacts_from_command(self, command_id: int) -> list[BoltResource]:
+        """
+        Get the artifacts produced by a Bolt command.
+        """
+
         query = """
             query boltCommand($commandId: Int!) {
                 boltCommand(commandId: $commandId) {
@@ -270,6 +310,10 @@ class ParadimeHook(BaseHook):
         return artifacts
 
     def get_artifact_from_command_by_path(self, command_id: int, artifact_path: str) -> BoltResource | None:
+        """
+        Get a specific artifact produced by a Bolt command.
+        """
+
         artifacts = self.get_artifacts_from_command(command_id=command_id)
         for artifact in artifacts:
             if artifact.path == artifact_path:
@@ -278,6 +322,10 @@ class ParadimeHook(BaseHook):
         return None
 
     def get_artifact_download_url(self, artifact_id: int) -> str:
+        """
+        Get the download URL for an artifact.
+        """
+
         query = """
             query boltResourceUrl($resourceId: Int!) {
                 boltResourceUrl(resourceId: $resourceId) {
@@ -292,6 +340,10 @@ class ParadimeHook(BaseHook):
         return response_json["url"]
 
     def cancel_bolt_run(self, run_id) -> None:
+        """
+        Cancel a Bolt run.
+        """
+
         query = """
             mutation CancelBoltRun($runId: Int!) {
                 cancelBoltRun(runId: $runId) {
@@ -304,6 +356,10 @@ class ParadimeHook(BaseHook):
         self._call_gql(query=query, variables={"runId": int(run_id)})
 
     def download_artifact(self, artifact_id: int, output_file_name: str) -> str:
+        """
+        Download an artifact to a file.
+        """
+
         artifact_url = self.get_artifact_download_url(artifact_id=artifact_id)
         response = requests.get(url=artifact_url, timeout=300)
         response.raise_for_status()
@@ -315,6 +371,10 @@ class ParadimeHook(BaseHook):
         return output_file_path.as_posix()
 
     def get_workspaces(self) -> Any:
+        """
+        Get a list of active workspaces.
+        """
+
         query = """
             query listWorkspaces{
                 listWorkspaces{
@@ -339,6 +399,10 @@ class ParadimeHook(BaseHook):
         return workspaces
 
     def get_active_users(self) -> list[ActiveUser]:
+        """
+        Get a list of active users.
+        """
+
         query = """
             query listActiveUsers {
                 listUsers{
@@ -368,6 +432,10 @@ class ParadimeHook(BaseHook):
         return active_users
 
     def get_invited_users(self) -> list[InvitedUser]:
+        """
+        Get a list of invited users and their invite status.
+        """
+
         query = """
             query listInvitedUsers {
                 listUsers{
@@ -395,6 +463,10 @@ class ParadimeHook(BaseHook):
         return invited_users
 
     def invite_user(self, email: str, account_type: UserAccountType) -> None:
+        """
+        Invite a user to the workspace.
+        """
+
         query = """
             mutation inviteUser($email: String!, $accountType: UserAccountType!) {
                 inviteUser(email: $email, accountType: $accountType){
@@ -406,6 +478,10 @@ class ParadimeHook(BaseHook):
         self._call_gql(query=query, variables={"email": email, "accountType": account_type.value})
 
     def update_user_account_type(self, uid: str, account_type: UserAccountType) -> None:
+        """
+        Update a user's account type.
+        """
+
         query = """
             mutation updateUserAccountType($uid: String!, $accountType: UserAccountType!) {
                 updateUserAccountType(uid: $uid, accountType: $accountType){
@@ -417,6 +493,10 @@ class ParadimeHook(BaseHook):
         self._call_gql(query=query, variables={"uid": uid, "accountType": account_type.value})
 
     def disable_user(self, uid: str) -> None:
+        """
+        Disable a user.
+        """
+
         query = """
             mutation disableUser($uid: String!) {
                 disableUser(uid: $uid){
