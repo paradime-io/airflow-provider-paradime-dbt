@@ -216,7 +216,6 @@ class ParadimeHook(BaseHook):
         query = """
             mutation triggerBoltRun($scheduleName: String!, $commands: [String!]) {
                 triggerBoltRun(scheduleName: $scheduleName, commands: $commands){
-                    ok
                     runId
                 }
             }
@@ -323,13 +322,12 @@ class ParadimeHook(BaseHook):
 
     def get_artifact_download_url(self, artifact_id: int) -> str:
         """
-        Get the download URL for an artifact.
+        Get the pre-signed s3 download URL for an artifact.
         """
 
         query = """
             query boltResourceUrl($resourceId: Int!) {
                 boltResourceUrl(resourceId: $resourceId) {
-                    ok
                     url
                 }
             }
@@ -348,7 +346,6 @@ class ParadimeHook(BaseHook):
             mutation CancelBoltRun($runId: Int!) {
                 cancelBoltRun(runId: $runId) {
                     ok
-                    errorLog
                 }
             }
         """
@@ -357,7 +354,7 @@ class ParadimeHook(BaseHook):
 
     def download_artifact(self, artifact_id: int, output_file_name: str) -> str:
         """
-        Download an artifact to a file.
+        Download an artifact to a file. Returns the absolute file path.
         """
 
         artifact_url = self.get_artifact_download_url(artifact_id=artifact_id)

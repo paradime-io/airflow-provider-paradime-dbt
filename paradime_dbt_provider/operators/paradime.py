@@ -79,12 +79,16 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
 
         artifact = None
         for command in commands_to_search:
+            self.log.info(f"Searching for artifact {self.artifact_path!r} in command ({command.id}) {command.command!r}")
             artifact = self.hook.get_artifact_from_command_by_path(command_id=command.id, artifact_path=self.artifact_path)
             if artifact is not None:
+                self.log.info(f"Found artifact {self.artifact_path!r} in command ({command.id}) {command.command!r}")
                 break
+            else:
+                self.log.info(f"Artifact {self.artifact_path!r} not found in command ({command.id}) {command.command!r}")
 
         if artifact is None:
-            raise ParadimeException(f"Artifact {self.artifact_path!r} not found.")
+            raise ParadimeException(f"Artifact {self.artifact_path!r} not found in run {self.run_id!r}")
 
         if self.output_file_name is None:
             self.output_file_name = f"{self.run_id}_{Path(self.artifact_path).name}"
