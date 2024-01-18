@@ -16,7 +16,7 @@ This is the provider for Paradime to run and manage dbt™ jobs in production. T
 ### Create a connection
 1. Generate your API key, secret and endpoint from Paradime Workspace settings.
 2. Create a connection in Airflow, as shown below.
-![Create a connection](./images/connection.png)
+![Create a connection](https://github.com/paradime-io/airflow-provider-paradime-dbt/assets/16359086/5f85f981-6555-4c4b-bec0-bf9b1ad79044)
 
 ### Create a DAG
 
