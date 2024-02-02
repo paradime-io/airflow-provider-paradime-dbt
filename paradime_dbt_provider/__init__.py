@@ -6,7 +6,7 @@ def get_provider_info():
     return {
         "package-name": "airflow-provider-paradime-dbt",  # Required
         "name": "Paradime",  # Required
-        "description": "This is provider for Paradime to run and manage dbt™ jobs in production. The provider enables interaction with Paradime's Bolt scheduler and management APIs.",  # Required
+        "description": "The Airflow provider for Paradime to run and manage dbt™ jobs in production. The provider enables interaction with Paradime's Bolt scheduler and management APIs.",  # Required
         "connection-types": [
             {
                 "connection-type": "paradime",
