@@ -8,7 +8,7 @@ authors = [
     {name = "Bhuvan Singla", email = "bhuvan@paradime.io"},
 ]
 license = {text = "Apache License 2.0"}
-description = "This is provider for Paradime to run and manage dbt™ jobs in production. The provider enables interaction with Paradime’s Bolt scheduler and management APIs."
+description = "The Airflow provider for Paradime to run and manage dbt™ jobs in production. The provider enables interaction with Paradime’s Bolt scheduler and management APIs."
 classifiers = [
     "Framework :: Apache Airflow",
     "Framework :: Apache Airflow :: Provider",
