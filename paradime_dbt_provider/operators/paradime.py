@@ -20,6 +20,8 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
     :param commands: Optional. A list of dbt commands to run. This will override the commands defined in the schedule.
     """
 
+    template_fields = ["schedule_name", "commands"]
+
     def __init__(
         self,
         *,
@@ -49,7 +51,7 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
     :param output_file_name: Optional. The name of the file to download the artifact to. Defaults to the <run_id>_<artifact_file_name>. Example: 42_manifest.json
     """
 
-    template_fields = ["run_id", "output_file_name"]
+    template_fields = ["run_id", "artifact_path", "command_index", "output_file_name"]
 
     def __init__(
         self,
