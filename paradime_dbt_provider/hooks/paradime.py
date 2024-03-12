@@ -51,10 +51,10 @@ class BoltSchedule:
     turbo_ci: BoltDeferredSchedule | None
     commands: list[str]
     git_branch: str | None
-    slack_on: list[str]
-    slack_notify: list[str]
-    email_on: list[str]
-    email_notify: list[str]
+    slack_on: list[str] | None
+    slack_notify: list[str] | None
+    email_on: list[str] | None
+    email_notify: list[str] | None
 
 
 @dataclass
@@ -345,19 +345,31 @@ class ParadimeHook(BaseHook):
             latest_run_id=response_json["latestRunId"],
         )
 
-    def trigger_bolt_run(self, schedule_name: str, commands: list[str] | None = None) -> int:
+    def trigger_bolt_run(
+        self,
+        schedule_name: str,
+        commands: list[str] | None = None,
+        branch: str | None = None,
+    ) -> int:
         """
         Trigger a Bolt run. Returns the run ID.
         """
 
         query = """
-            mutation triggerBoltRun($scheduleName: String!, $commands: [String!]) {
-                triggerBoltRun(scheduleName: $scheduleName, commands: $commands){
+            mutation triggerBoltRun($scheduleName: String!, $commands: [String!], $branch: String) {
+                triggerBoltRun(scheduleName: $scheduleName, commands: $commands, branch: $branch) {
                     runId
                 }
             }
         """
-        response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name, "commands": commands})["triggerBoltRun"]
+        response_json = self._call_gql(
+            query=query,
+            variables={
+                "scheduleName": schedule_name,
+                "commands": commands,
+                "branch": branch,
+            },
+        )["triggerBoltRun"]
 
         return response_json["runId"]
 
@@ -481,7 +493,7 @@ class ParadimeHook(BaseHook):
 
         query = """
             mutation CancelBoltRun($runId: Int!) {
-                cancelBoltRun(runId: $runId) {
+                cancelBoltRun(scheduleRunId: $runId) {
                     ok
                 }
             }
