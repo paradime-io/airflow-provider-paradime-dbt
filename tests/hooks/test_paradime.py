@@ -136,9 +136,10 @@ class TestParadimeHook(unittest.TestCase):
         mock_raise_for_gql_errors.assert_called_once_with(response)
 
     @patch("requests.post")
+    @patch.object(ParadimeHook, "_get_proxies")
     @patch.object(ParadimeHook, "_get_api_endpoint")
     @patch.object(ParadimeHook, "_get_request_headers")
-    def test_call_gql(self, mock_get_headers, mock_get_api_endpoint, mock_post):
+    def test_call_gql(self, mock_get_headers, mock_get_api_endpoint, mock_get_proxies, mock_post):
         # Mock
         mock_response = MagicMock(spec=requests.Response)
         mock_post.return_value = mock_response
@@ -147,6 +148,11 @@ class TestParadimeHook(unittest.TestCase):
 
         mock_get_api_endpoint.return_value = "http://test-api-endpoint"
         mock_get_headers.return_value = {"Content-Type": "application/json"}
+
+        mock_get_proxies.return_value = {
+            "http": "http://proxy:8080",
+            "https": "http://proxy:8080",
+        }
 
         # Call
         result = self.hook._call_gql(query="test_query", variables={"var_key": "var_value"})
@@ -159,6 +165,10 @@ class TestParadimeHook(unittest.TestCase):
             url="http://test-api-endpoint",
             json={"query": "test_query", "variables": {"var_key": "var_value"}},
             headers={"Content-Type": "application/json"},
+            proxies={
+                "http": "http://proxy:8080",
+                "https": "http://proxy:8080",
+            },
             timeout=60,
         )
 
