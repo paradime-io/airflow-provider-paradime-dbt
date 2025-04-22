@@ -54,7 +54,16 @@ def run_schedule_and_download_manifest():
 
 
 run_schedule_and_download_manifest()
-
 ```
 
 Refer to the [example DAGs](https://github.com/paradime-io/airflow-provider-paradime-dbt/tree/main/paradime_dbt_provider/example_dags) in this repository for more examples.
+
+## Advanced Configuration
+
+### HTTP / HTTPS Proxy
+
+If you need to use a proxy to connect to Paradime's API, you can configure it in the connection on the Airflow UI. You can set the following parameters in the connection:
+
+- **Proxy**: The URL for your proxy server (e.g., `http://proxy.example.com:8080`).
+
+This setting is optional. If not provided, connections will be made directly without a proxy. 

@@ -28,6 +28,14 @@ content-type = "text/markdown"
 [project.entry-points.apache_airflow_provider]
 provider_info = "paradime_dbt_provider.__init__:get_provider_info"
 
+[project.optional-dependencies]
+dev = [
+    "black==24.8.0",
+    "isort==5.13.2",
+    "mypy==1.14.1",
+    "types-requests>=2.31.0",
+]
+
 [tool.setuptools]
 include-package-data = false
 

@@ -31,7 +31,7 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
 
         # Assert
         self.assertEqual(result, run_id)
-        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=None)
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=None, branch=None)
 
     @patch.object(ParadimeHook, "trigger_bolt_run")
     def test_execute_with_commands(self, mock_trigger_bolt_run):
@@ -48,7 +48,24 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
 
         # Assert
         self.assertEqual(result, run_id)
-        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=commands)
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=commands, branch=None)
+
+    @patch.object(ParadimeHook, "trigger_bolt_run")
+    def test_execute_with_branch(self, mock_trigger_bolt_run):
+        # Mock
+        run_id = 42
+        branch = "feature/branch"
+        self.operator.branch = branch
+        mock_trigger_bolt_run.return_value = run_id
+        self.mock_hook_instance.trigger_bolt_run = mock_trigger_bolt_run
+        context = MagicMock()
+
+        # Call
+        result = self.operator.execute(context)
+
+        # Assert
+        self.assertEqual(result, run_id)
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=None, branch=branch)
 
 
 class TestParadimeBoltDbtScheduleRunArtifactOperator(unittest.TestCase):
