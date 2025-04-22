@@ -310,20 +310,24 @@ class ParadimeHook(BaseHook):
                     id=schedule_json["id"],
                     uuid=schedule_json["uuid"],
                     source=schedule_json["source"],
-                    deferred_schedule=BoltDeferredSchedule(
-                        enabled=schedule_json["deferredSchedule"]["enabled"],
-                        deferred_schedule_name=schedule_json["deferredSchedule"]["deferredScheduleName"],
-                        successful_run_only=schedule_json["deferredSchedule"]["successfulRunOnly"],
-                    )
-                    if schedule_json["deferredSchedule"]
-                    else None,
-                    turbo_ci=BoltDeferredSchedule(
-                        enabled=schedule_json["turboCi"]["enabled"],
-                        deferred_schedule_name=schedule_json["turboCi"]["deferredScheduleName"],
-                        successful_run_only=schedule_json["turboCi"]["successfulRunOnly"],
-                    )
-                    if schedule_json["turboCi"]
-                    else None,
+                    deferred_schedule=(
+                        BoltDeferredSchedule(
+                            enabled=schedule_json["deferredSchedule"]["enabled"],
+                            deferred_schedule_name=schedule_json["deferredSchedule"]["deferredScheduleName"],
+                            successful_run_only=schedule_json["deferredSchedule"]["successfulRunOnly"],
+                        )
+                        if schedule_json["deferredSchedule"]
+                        else None
+                    ),
+                    turbo_ci=(
+                        BoltDeferredSchedule(
+                            enabled=schedule_json["turboCi"]["enabled"],
+                            deferred_schedule_name=schedule_json["turboCi"]["deferredScheduleName"],
+                            successful_run_only=schedule_json["turboCi"]["successfulRunOnly"],
+                        )
+                        if schedule_json["turboCi"]
+                        else None
+                    ),
                     commands=schedule_json["commands"],
                     git_branch=schedule_json["gitBranch"],
                     slack_on=schedule_json["slackOn"],
