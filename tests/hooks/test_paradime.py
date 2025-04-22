@@ -208,7 +208,7 @@ class TestParadimeHook(unittest.TestCase):
         # Assert
         mock_call_gql.assert_called_once_with(
             query=unittest.mock.ANY,
-            variables={"scheduleName": schedule_name, "commands": commands},
+            variables={"scheduleName": schedule_name, "commands": commands, "branch": None},
         )
         self.assertEqual(result, expected_response["triggerBoltRun"]["runId"])
 
@@ -370,6 +370,11 @@ class TestParadimeHook(unittest.TestCase):
         # Mock
         artifact_id = 101
         output_file_name = "output.txt"
+        proxy = "http://proxy:8080"
+        expected_proxies = {
+            "http": proxy,
+            "https": proxy,
+        }
         expected_response = {
             "boltResourceUrl": {
                 "ok": True,
@@ -377,6 +382,9 @@ class TestParadimeHook(unittest.TestCase):
             }
         }
         mock_call_gql.return_value = expected_response
+
+        # Mock get_proxies to return proxy settings
+        self.hook._get_proxies = Mock(return_value=expected_proxies)
 
         with patch("requests.get") as mock_get:
             mock_response = MagicMock()
@@ -389,7 +397,7 @@ class TestParadimeHook(unittest.TestCase):
 
             # Assert
             mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"resourceId": artifact_id})
-            mock_get.assert_called_once_with(url=expected_response["boltResourceUrl"]["url"], timeout=300)
+            mock_get.assert_called_once_with(url=expected_response["boltResourceUrl"]["url"], timeout=300, proxies=expected_proxies)
             mock_response.raise_for_status.assert_called_once()
             self.assertEqual(result, Path(output_file_name).absolute().as_posix())
             Path(output_file_name).unlink()
@@ -641,6 +649,47 @@ class TestParadimeHook(unittest.TestCase):
                 total_count=1,
             ),
         )
+
+    def test_get_proxies_with_proxy(self):
+        # Mock
+        extra = {
+            "api_endpoint": "https://example.com",
+            "api_key": "key",
+            "api_secret": "secret",
+            "proxy": "http://proxy:8080",
+        }
+        conn = Mock()
+        conn.extra_dejson = extra
+        self.hook.get_connection = Mock(return_value=conn)
+
+        # Call
+        result = self.hook._get_proxies()
+
+        # Assert
+        self.assertEqual(
+            result,
+            {
+                "http": "http://proxy:8080",
+                "https": "http://proxy:8080",
+            },
+        )
+
+    def test_get_proxies_with_no_proxy(self):
+        # Mock
+        extra = {
+            "api_endpoint": "https://example.com",
+            "api_key": "key",
+            "api_secret": "secret",
+        }
+        conn = Mock()
+        conn.extra_dejson = extra
+        self.hook.get_connection = Mock(return_value=conn)
+
+        # Call
+        result = self.hook._get_proxies()
+
+        # Assert
+        self.assertEqual(result, {})
 
 
 if __name__ == "__main__":

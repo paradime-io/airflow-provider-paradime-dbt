@@ -144,6 +144,7 @@ class ParadimeHook(BaseHook):
             "api_endpoint": StringField(lazy_gettext("API Endpoint"), widget=BS3TextFieldWidget()),
             "api_key": StringField(lazy_gettext("API Key"), widget=BS3TextFieldWidget()),
             "api_secret": PasswordField(lazy_gettext("API Secret"), widget=BS3PasswordFieldWidget()),
+            "proxy": StringField(lazy_gettext("Proxy"), widget=BS3TextFieldWidget()),
         }
 
     @staticmethod
@@ -159,6 +160,7 @@ class ParadimeHook(BaseHook):
                 "api_endpoint": "Generate API endpoint from Paradime Workspace settings.",
                 "api_key": "Generate API key from Paradime Workspace settings.",
                 "api_secret": "Generate API secret from Paradime Workspace settings.",
+                "proxy": "Proxy URL (e.g., http://proxy.example.com:8080). Leave blank or set to 'none' to disable.",
             },
         }
 
@@ -178,6 +180,7 @@ class ParadimeHook(BaseHook):
         api_endpoint: str
         api_key: str
         api_secret: str
+        proxy: str | None = None
 
     def _get_auth_config(self) -> AuthConfig:
         """
@@ -186,10 +189,19 @@ class ParadimeHook(BaseHook):
 
         conn = self.get_connection(self.conn_id)
         extra = conn.extra_dejson
+
+        proxy = extra.get("proxy")
+
+        # Convert proxy to None if it is set to "none" (case insensitive)
+        # This is useful to unset the proxy, as Airflow UI does not unset the value by simply leaving it blank.
+        if proxy and proxy.lower() == "none":
+            proxy = None
+
         return self.AuthConfig(
             api_endpoint=extra["api_endpoint"],
             api_key=extra["api_key"],
             api_secret=extra["api_secret"],
+            proxy=proxy,
         )
 
     def _get_api_endpoint(self) -> str:
@@ -201,6 +213,17 @@ class ParadimeHook(BaseHook):
             "X-API-KEY": self._get_auth_config().api_key,
             "X-API-SECRET": self._get_auth_config().api_secret,
         }
+
+    def _get_proxies(self) -> dict[str, str]:
+        """
+        Get proxy configuration from auth config.
+        """
+        auth_config = self._get_auth_config()
+        proxies = {}
+        if auth_config.proxy:
+            proxies["http"] = auth_config.proxy
+            proxies["https"] = auth_config.proxy
+        return proxies
 
     def _raise_for_gql_errors(self, response: requests.Response) -> None:
         response_json = response.json()
@@ -221,6 +244,7 @@ class ParadimeHook(BaseHook):
             url=self._get_api_endpoint(),
             json={"query": query, "variables": variables},
             headers=self._get_request_headers(),
+            proxies=self._get_proxies(),
             timeout=60,
         )
         self._raise_for_errors(response)
@@ -507,7 +531,7 @@ class ParadimeHook(BaseHook):
         """
 
         artifact_url = self.get_artifact_download_url(artifact_id=artifact_id)
-        response = requests.get(url=artifact_url, timeout=300)
+        response = requests.get(url=artifact_url, proxies=self._get_proxies(), timeout=300)
         response.raise_for_status()
 
         output_file_path = Path(output_file_name).absolute()
