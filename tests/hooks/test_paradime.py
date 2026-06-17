@@ -175,9 +175,9 @@ class TestParadimeHook(unittest.TestCase):
         self.assertEqual(result, {"result_key": "result_value"})
 
     @patch.object(ParadimeHook, "_call_gql")
-    def test_get_bolt_schedule(self, mock_call_gql):
+    def test_get_bolt_schedule_with_slug(self, mock_call_gql):
         # Mock
-        schedule_name = "test_schedule"
+        slug = "test-schedule-a1b2c3"
         expected_response = {
             "boltScheduleName": {
                 "ok": True,
@@ -192,11 +192,11 @@ class TestParadimeHook(unittest.TestCase):
         mock_call_gql.return_value = expected_response
 
         # Call
-        result = self.hook.get_bolt_schedule(schedule_name=schedule_name)
+        result = self.hook.get_bolt_schedule(slug=slug)
 
         # Assert
-        mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"scheduleName": schedule_name})
-        self.assertEqual(result.name, schedule_name)
+        mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"slug": slug})
+        self.assertEqual(result.name, slug)
         self.assertEqual(result.commands, expected_response["boltScheduleName"]["commands"])
         self.assertEqual(result.owner, expected_response["boltScheduleName"]["owner"])
         self.assertEqual(result.schedule, expected_response["boltScheduleName"]["schedule"])
@@ -205,22 +205,70 @@ class TestParadimeHook(unittest.TestCase):
         self.assertEqual(result.latest_run_id, expected_response["boltScheduleName"]["latestRunId"])
 
     @patch.object(ParadimeHook, "_call_gql")
-    def test_trigger_bolt_run(self, mock_call_gql):
-        # Mock
+    def test_get_bolt_schedule_with_deprecated_schedule_name(self, mock_call_gql):
+        """The legacy ``schedule_name=`` kwarg keeps working and routes via ``slug:`` on the wire."""
         schedule_name = "test_schedule"
+        mock_call_gql.return_value = {
+            "boltScheduleName": {
+                "ok": True,
+                "latestRunId": 1,
+                "commands": [],
+                "owner": "owner",
+                "schedule": "OFF",
+                "uuid": "uuid",
+                "source": "source",
+            }
+        }
+
+        with self.assertWarns(DeprecationWarning):
+            self.hook.get_bolt_schedule(schedule_name=schedule_name)
+
+        mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"slug": schedule_name})
+
+    def test_get_bolt_schedule_rejects_missing_and_both(self):
+        with self.assertRaises(ValueError):
+            self.hook.get_bolt_schedule()
+        with self.assertRaises(ValueError):
+            self.hook.get_bolt_schedule(slug="a", schedule_name="b")
+
+    @patch.object(ParadimeHook, "_call_gql")
+    def test_trigger_bolt_run_with_slug(self, mock_call_gql):
+        # Mock
+        slug = "test-schedule-a1b2c3"
         commands = ["cmd1", "cmd2"]
         expected_response = {"triggerBoltRun": {"ok": True, "runId": 123}}
         mock_call_gql.return_value = expected_response
 
         # Call
-        result = self.hook.trigger_bolt_run(schedule_name=schedule_name, commands=commands)
+        result = self.hook.trigger_bolt_run(slug=slug, commands=commands)
 
         # Assert
         mock_call_gql.assert_called_once_with(
             query=unittest.mock.ANY,
-            variables={"scheduleName": schedule_name, "commands": commands, "branch": None},
+            variables={"slug": slug, "commands": commands, "branch": None},
         )
         self.assertEqual(result, expected_response["triggerBoltRun"]["runId"])
+
+    @patch.object(ParadimeHook, "_call_gql")
+    def test_trigger_bolt_run_with_deprecated_schedule_name(self, mock_call_gql):
+        """The legacy ``schedule_name=`` kwarg keeps working and routes via ``slug:`` on the wire."""
+        schedule_name = "test_schedule"
+        commands = ["cmd1", "cmd2"]
+        mock_call_gql.return_value = {"triggerBoltRun": {"ok": True, "runId": 123}}
+
+        with self.assertWarns(DeprecationWarning):
+            self.hook.trigger_bolt_run(schedule_name=schedule_name, commands=commands)
+
+        mock_call_gql.assert_called_once_with(
+            query=unittest.mock.ANY,
+            variables={"slug": schedule_name, "commands": commands, "branch": None},
+        )
+
+    def test_trigger_bolt_run_rejects_missing_and_both(self):
+        with self.assertRaises(ValueError):
+            self.hook.trigger_bolt_run()
+        with self.assertRaises(ValueError):
+            self.hook.trigger_bolt_run(slug="a", schedule_name="b")
 
     @patch.object(ParadimeHook, "_call_gql")
     def test_get_bolt_run_status(self, mock_call_gql):

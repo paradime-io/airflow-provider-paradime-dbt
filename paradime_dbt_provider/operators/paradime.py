@@ -16,30 +16,43 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
     Triggers a Paradime Bolt dbt schedule run.
 
     :param conn_id: The Airflow connection id to use when connecting to Paradime.
-    :param schedule_name: The name of the bolt schedule to run.
+    :param slug: The slug of the bolt schedule to run (preferred). Returned by
+        ``createBoltSchedule`` and shown in the Bolt UI.
+    :param schedule_name: Deprecated alias for ``slug`` — carries a schedule
+        slug. Kept for backwards compatibility with existing DAGs. Exactly one
+        of ``slug`` or ``schedule_name`` must be provided.
     :param commands: Optional. A list of dbt commands to run. This will override the commands defined in the schedule.
     :param branch: Optional. A branch or commit hash to run the schedule on. This will override the branch defined in the schedule.
     """
 
-    template_fields = ["schedule_name", "commands"]
+    template_fields = ["slug", "schedule_name", "commands"]
 
     def __init__(
         self,
         *,
         conn_id: str,
-        schedule_name: str,
+        slug: str | None = None,
+        schedule_name: str | None = None,
         commands: list[str] | None = None,
         branch: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
+        self.slug = slug
         self.schedule_name = schedule_name
         self.hook = ParadimeHook(conn_id=conn_id)
         self.commands = commands
         self.branch = branch
 
     def execute(self, context: Context) -> int:
-        run_id = self.hook.trigger_bolt_run(schedule_name=self.schedule_name, commands=self.commands, branch=self.branch)
+        # XOR validation is deferred to the hook so DAG parsing doesn't raise
+        # on import — only the scheduler-heartbeat-driven execute() does.
+        run_id = self.hook.trigger_bolt_run(
+            slug=self.slug,
+            schedule_name=self.schedule_name,
+            commands=self.commands,
+            branch=self.branch,
+        )
         return run_id
 
 

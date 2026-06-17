@@ -9,14 +9,27 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
     @patch("paradime_dbt_provider.operators.paradime.ParadimeHook")
     def setUp(self, mock_paradime_hook):
         self.conn_id = "paradime_conn_default"
-        self.schedule_name = "test_schedule"
-        self.operator = ParadimeBoltDbtScheduleRunOperator(conn_id=self.conn_id, schedule_name=self.schedule_name, task_id="test_task")
+        self.slug = "test-schedule-a1b2c3"
+        self.operator = ParadimeBoltDbtScheduleRunOperator(conn_id=self.conn_id, slug=self.slug, task_id="test_task")
         self.mock_hook_instance = mock_paradime_hook.return_value
 
-    def test_init(self):
-        # Assert
+    def test_init_with_slug(self):
         self.assertEqual(self.operator.hook, self.mock_hook_instance)
-        self.assertEqual(self.operator.schedule_name, self.schedule_name)
+        self.assertEqual(self.operator.slug, self.slug)
+        self.assertIsNone(self.operator.schedule_name)
+
+    @patch("paradime_dbt_provider.operators.paradime.ParadimeHook")
+    def test_init_with_deprecated_schedule_name(self, mock_paradime_hook):
+        """Existing DAGs using ``schedule_name=`` still construct the operator successfully.
+
+        XOR validation is deferred to execute() so DAG parsing never raises on
+        import, no matter what kwargs the caller used.
+        """
+        operator = ParadimeBoltDbtScheduleRunOperator(
+            conn_id=self.conn_id, schedule_name="legacy_name", task_id="legacy_task"
+        )
+        self.assertIsNone(operator.slug)
+        self.assertEqual(operator.schedule_name, "legacy_name")
 
     @patch.object(ParadimeHook, "trigger_bolt_run")
     def test_execute(self, mock_trigger_bolt_run):
@@ -31,7 +44,9 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
 
         # Assert
         self.assertEqual(result, run_id)
-        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=None, branch=None)
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(
+            slug=self.slug, schedule_name=None, commands=None, branch=None
+        )
 
     @patch.object(ParadimeHook, "trigger_bolt_run")
     def test_execute_with_commands(self, mock_trigger_bolt_run):
@@ -48,7 +63,9 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
 
         # Assert
         self.assertEqual(result, run_id)
-        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=commands, branch=None)
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(
+            slug=self.slug, schedule_name=None, commands=commands, branch=None
+        )
 
     @patch.object(ParadimeHook, "trigger_bolt_run")
     def test_execute_with_branch(self, mock_trigger_bolt_run):
@@ -65,7 +82,29 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
 
         # Assert
         self.assertEqual(result, run_id)
-        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(schedule_name=self.schedule_name, commands=None, branch=branch)
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(
+            slug=self.slug, schedule_name=None, commands=None, branch=branch
+        )
+
+    @patch("paradime_dbt_provider.operators.paradime.ParadimeHook")
+    def test_execute_forwards_deprecated_schedule_name(self, mock_paradime_hook):
+        """Legacy DAGs using ``schedule_name=`` forward the value to the hook unchanged.
+
+        The hook's XOR helper handles the resolution + DeprecationWarning at
+        runtime — the operator itself just passes both kwargs through.
+        """
+        operator = ParadimeBoltDbtScheduleRunOperator(
+            conn_id=self.conn_id, schedule_name="legacy_name", task_id="legacy_task"
+        )
+        mock_hook_instance = mock_paradime_hook.return_value
+        mock_hook_instance.trigger_bolt_run.return_value = 99
+
+        result = operator.execute(MagicMock())
+
+        self.assertEqual(result, 99)
+        mock_hook_instance.trigger_bolt_run.assert_called_once_with(
+            slug=None, schedule_name="legacy_name", commands=None, branch=None
+        )
 
 
 class TestParadimeBoltDbtScheduleRunArtifactOperator(unittest.TestCase):
