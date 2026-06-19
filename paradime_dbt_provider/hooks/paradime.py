@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -11,6 +12,35 @@ from airflow.hooks.base import BaseHook  # type: ignore[import]
 
 class ParadimeException(Exception):
     pass
+
+
+def _resolve_slug_or_schedule_name(
+    *,
+    slug: str | None,
+    schedule_name: str | None,
+    method: str,
+) -> str:
+    """Resolve the schedule slug from the dual ``slug`` / ``schedule_name`` input.
+
+    Both arguments accept a slug — ``schedule_name`` is the deprecated alias
+    kept for backwards compatibility with existing DAGs. Exactly one of the
+    two must be provided; ``ValueError`` is raised otherwise. When the caller
+    uses the deprecated ``schedule_name`` kwarg, a ``DeprecationWarning`` is
+    emitted pointing at their call site.
+
+    Mirrors the same helper in paradime-python-sdk's bolt client. The resolved
+    value is sent on the wire as the new ``slug`` field, which both new and
+    old backends accept.
+    """
+    if bool(slug) == bool(schedule_name):
+        raise ValueError(f"`{method}` requires exactly one of `slug` or `schedule_name` (deprecated). " "Both fields accept a schedule slug.")
+    if schedule_name is not None:
+        warnings.warn(
+            f"Passing `schedule_name=` to `{method}` is deprecated; use `slug=` instead. " "Both kwargs accept a schedule slug.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+    return slug or schedule_name  # type: ignore[return-value]
 
 
 class BoltRunState(Enum):
@@ -342,14 +372,25 @@ class ParadimeHook(BaseHook):
             total_count=response_json["totalCount"],
         )
 
-    def get_bolt_schedule(self, schedule_name: str) -> BoltScheduleInfo:
+    def get_bolt_schedule(
+        self,
+        schedule_name: str | None = None,
+        *,
+        slug: str | None = None,
+    ) -> BoltScheduleInfo:
         """
         Get details of a Bolt schedule.
+
+        Identify the schedule with ``slug`` (preferred) or ``schedule_name``
+        (deprecated alias kept for backwards compatibility — both accept a
+        schedule slug). Exactly one of the two must be provided.
         """
 
+        resolved_slug = _resolve_slug_or_schedule_name(slug=slug, schedule_name=schedule_name, method="get_bolt_schedule")
+
         query = """
-            query boltScheduleName($scheduleName: String!) {
-                boltScheduleName(scheduleName: $scheduleName) {
+            query boltScheduleName($slug: String) {
+                boltScheduleName(slug: $slug) {
                     ok
                     latestRunId
                     commands
@@ -361,10 +402,10 @@ class ParadimeHook(BaseHook):
             }
         """
 
-        response_json = self._call_gql(query=query, variables={"scheduleName": schedule_name})["boltScheduleName"]
+        response_json = self._call_gql(query=query, variables={"slug": resolved_slug})["boltScheduleName"]
 
         return BoltScheduleInfo(
-            name=schedule_name,
+            name=resolved_slug,
             commands=response_json["commands"],
             schedule=response_json["schedule"],
             uuid=response_json["uuid"],
@@ -375,17 +416,25 @@ class ParadimeHook(BaseHook):
 
     def trigger_bolt_run(
         self,
-        schedule_name: str,
+        schedule_name: str | None = None,
         commands: list[str] | None = None,
         branch: str | None = None,
+        *,
+        slug: str | None = None,
     ) -> int:
         """
         Trigger a Bolt run. Returns the run ID.
+
+        Identify the schedule with ``slug`` (preferred) or ``schedule_name``
+        (deprecated alias kept for backwards compatibility — both accept a
+        schedule slug). Exactly one of the two must be provided.
         """
 
+        resolved_slug = _resolve_slug_or_schedule_name(slug=slug, schedule_name=schedule_name, method="trigger_bolt_run")
+
         query = """
-            mutation triggerBoltRun($scheduleName: String!, $commands: [String!], $branch: String) {
-                triggerBoltRun(scheduleName: $scheduleName, commands: $commands, branch: $branch) {
+            mutation triggerBoltRun($slug: String, $commands: [String!], $branch: String) {
+                triggerBoltRun(slug: $slug, commands: $commands, branch: $branch) {
                     runId
                 }
             }
@@ -393,7 +442,7 @@ class ParadimeHook(BaseHook):
         response_json = self._call_gql(
             query=query,
             variables={
-                "scheduleName": schedule_name,
+                "slug": resolved_slug,
                 "commands": commands,
                 "branch": branch,
             },

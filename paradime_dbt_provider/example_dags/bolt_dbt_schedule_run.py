@@ -4,15 +4,17 @@ from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunA
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
 
 PARADIME_CONN_ID = "your_paradime_conn_id"  # Update this to your connection id
-BOLT_SCHEDULE_NAME = "your_schedule_name"  # Update this to your schedule name
+BOLT_SCHEDULE_SLUG = "your-schedule-slug"  # Update this to the slug returned by createBoltSchedule (shown in the Bolt UI)
 
 
 @dag(
     default_args={"conn_id": PARADIME_CONN_ID},
 )
 def run_schedule_and_download_manifest():
-    # Run the schedule and return the run id as the xcom return value
-    task_run_schedule = ParadimeBoltDbtScheduleRunOperator(task_id="run_schedule", schedule_name=BOLT_SCHEDULE_NAME)
+    # Run the schedule and return the run id as the xcom return value.
+    # Pre-1.2.0 DAGs using `schedule_name=BOLT_SCHEDULE_SLUG` still work
+    # (deprecated alias, emits a DeprecationWarning) — both kwargs accept a slug.
+    task_run_schedule = ParadimeBoltDbtScheduleRunOperator(task_id="run_schedule", slug=BOLT_SCHEDULE_SLUG)
 
     # Get the run id from the xcom return value
     run_id = "{{ task_instance.xcom_pull(task_ids='run_schedule') }}"
