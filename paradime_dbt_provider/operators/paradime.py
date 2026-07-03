@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from airflow.models import BaseOperator  # type: ignore[import]
 
-from paradime_dbt_provider.hooks.paradime import ParadimeException, ParadimeHook
+from paradime_dbt_provider.hooks.paradime import BoltRunState, ParadimeException, ParadimeHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context  # type: ignore
@@ -23,6 +23,12 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         of ``slug`` or ``schedule_name`` must be provided.
     :param commands: Optional. A list of dbt commands to run. This will override the commands defined in the schedule.
     :param branch: Optional. A branch or commit hash to run the schedule on. This will override the branch defined in the schedule.
+    :param retry_from_failure: Optional. When True, if the schedule's most
+        recent run failed, resume it from the point of failure (re-running only
+        the failed commands) instead of triggering a fresh run. If the latest
+        run did not fail (or there is no previous run), a new run is triggered
+        as usual. Note that ``commands`` and ``branch`` overrides do not apply
+        to a resumed run. Defaults to False.
     """
 
     template_fields = ["slug", "schedule_name", "commands"]
@@ -35,6 +41,7 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         schedule_name: str | None = None,
         commands: list[str] | None = None,
         branch: str | None = None,
+        retry_from_failure: bool = False,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -43,10 +50,18 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         self.hook = ParadimeHook(conn_id=conn_id)
         self.commands = commands
         self.branch = branch
+        self.retry_from_failure = retry_from_failure
 
     def execute(self, context: Context) -> int:
         # XOR validation is deferred to the hook so DAG parsing doesn't raise
         # on import — only the scheduler-heartbeat-driven execute() does.
+        if self.retry_from_failure and self._latest_run_failed():
+            self.log.info(f"Latest run of schedule {self.slug or self.schedule_name!r} failed; resuming from the point of failure")
+            return self.hook.retry_bolt_schedule_from_failure(
+                slug=self.slug,
+                schedule_name=self.schedule_name,
+            )
+
         run_id = self.hook.trigger_bolt_run(
             slug=self.slug,
             schedule_name=self.schedule_name,
@@ -54,6 +69,15 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
             branch=self.branch,
         )
         return run_id
+
+    def _latest_run_failed(self) -> bool:
+        """Return True if the schedule's most recent run ended in a failure state."""
+        schedule = self.hook.get_bolt_schedule(slug=self.slug, schedule_name=self.schedule_name)
+        if schedule.latest_run_id is None:
+            return False
+
+        state = self.hook.get_bolt_run_status(schedule.latest_run_id)
+        return state in (BoltRunState.FAILED.value, BoltRunState.ERROR.value)
 
 
 class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):

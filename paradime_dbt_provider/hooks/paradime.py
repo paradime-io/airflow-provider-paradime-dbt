@@ -578,6 +578,40 @@ class ParadimeHook(BaseHook):
 
         self._call_gql(query=query, variables={"runId": int(run_id)})
 
+    def retry_bolt_schedule_from_failure(
+        self,
+        schedule_name: str | None = None,
+        *,
+        slug: str | None = None,
+    ) -> int:
+        """
+        Retry the latest failed run of a Bolt schedule, resuming from its failed command.
+
+        Looks up the most recent run of the schedule and resumes it from the
+        point of failure, re-running only the failed commands. Returns the new
+        run ID.
+
+        Identify the schedule with ``slug`` (preferred) or ``schedule_name``
+        (deprecated alias kept for backwards compatibility — both accept a
+        schedule slug). Exactly one of the two must be provided.
+
+        Mirrors ``retry_schedule_from_failure`` in the paradime-python-sdk Bolt client.
+        """
+
+        resolved_slug = _resolve_slug_or_schedule_name(slug=slug, schedule_name=schedule_name, method="retry_bolt_schedule_from_failure")
+
+        query = """
+            mutation RetryBoltRunFromFailure($slug: String) {
+                retryBoltRunFromFailure(slug: $slug) {
+                    runId
+                }
+            }
+        """
+
+        response_json = self._call_gql(query=query, variables={"slug": resolved_slug})["retryBoltRunFromFailure"]
+
+        return response_json["runId"]
+
     def download_artifact(self, artifact_id: int, output_file_name: str) -> str:
         """
         Download an artifact to a file. Returns the absolute file path.

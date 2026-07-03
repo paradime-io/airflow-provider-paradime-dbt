@@ -4,6 +4,22 @@ All notable changes to this provider are documented in this file. The format fol
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] — 2026-07-03
+
+### Added
+
+- `retry_from_failure` keyword argument on `ParadimeBoltDbtScheduleRunOperator`.
+  When True, if the schedule's most recent run failed, the operator resumes it
+  from the point of failure (re-running only the failed commands) instead of
+  triggering a fresh run. If the latest run did not fail — or there is no
+  previous run — a new run is triggered as usual. Defaults to False, so
+  existing DAGs are unaffected.
+- `ParadimeHook.retry_bolt_schedule_from_failure`, which wraps the
+  `retryBoltRunFromFailure` GraphQL mutation and backs the flag above. Mirrors
+  the equivalent method in paradime-python-sdk.
+- Example DAG `bolt_dbt_schedule_run_retry.py` demonstrating
+  `retry_from_failure`.
+
 ## [1.2.0] — 2026-06-17
 
 ### Added

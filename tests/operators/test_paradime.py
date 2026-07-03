@@ -107,6 +107,59 @@ class TestParadimeBoltDbtScheduleRunOperator(unittest.TestCase):
         )
 
 
+class TestParadimeBoltDbtScheduleRunOperatorRetryFromFailure(unittest.TestCase):
+    @patch("paradime_dbt_provider.operators.paradime.ParadimeHook")
+    def setUp(self, mock_paradime_hook):
+        self.conn_id = "paradime_conn_default"
+        self.slug = "test-schedule-a1b2c3"
+        self.operator = ParadimeBoltDbtScheduleRunOperator(
+            conn_id=self.conn_id, slug=self.slug, retry_from_failure=True, task_id="test_task"
+        )
+        self.mock_hook_instance = mock_paradime_hook.return_value
+
+    def test_init_defaults_to_false(self):
+        operator = ParadimeBoltDbtScheduleRunOperator(conn_id=self.conn_id, slug=self.slug, task_id="t")
+        self.assertFalse(operator.retry_from_failure)
+
+    def test_resumes_when_latest_run_failed(self):
+        new_run_id = 999
+        self.mock_hook_instance.get_bolt_schedule.return_value = MagicMock(latest_run_id=555)
+        self.mock_hook_instance.get_bolt_run_status.return_value = "FAILED"
+        self.mock_hook_instance.retry_bolt_schedule_from_failure.return_value = new_run_id
+
+        result = self.operator.execute(MagicMock())
+
+        self.assertEqual(result, new_run_id)
+        self.mock_hook_instance.retry_bolt_schedule_from_failure.assert_called_once_with(
+            slug=self.slug, schedule_name=None
+        )
+        self.mock_hook_instance.trigger_bolt_run.assert_not_called()
+
+    def test_triggers_new_run_when_latest_run_succeeded(self):
+        self.mock_hook_instance.get_bolt_schedule.return_value = MagicMock(latest_run_id=555)
+        self.mock_hook_instance.get_bolt_run_status.return_value = "SUCCESS"
+        self.mock_hook_instance.trigger_bolt_run.return_value = 123
+
+        result = self.operator.execute(MagicMock())
+
+        self.assertEqual(result, 123)
+        self.mock_hook_instance.retry_bolt_schedule_from_failure.assert_not_called()
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once_with(
+            slug=self.slug, schedule_name=None, commands=None, branch=None
+        )
+
+    def test_triggers_new_run_when_no_previous_run(self):
+        self.mock_hook_instance.get_bolt_schedule.return_value = MagicMock(latest_run_id=None)
+        self.mock_hook_instance.trigger_bolt_run.return_value = 123
+
+        result = self.operator.execute(MagicMock())
+
+        self.assertEqual(result, 123)
+        self.mock_hook_instance.get_bolt_run_status.assert_not_called()
+        self.mock_hook_instance.retry_bolt_schedule_from_failure.assert_not_called()
+        self.mock_hook_instance.trigger_bolt_run.assert_called_once()
+
+
 class TestParadimeBoltDbtScheduleRunArtifactOperator(unittest.TestCase):
     @patch("paradime_dbt_provider.operators.paradime.ParadimeHook")
     def test_init(self, mock_paradime_hook):
