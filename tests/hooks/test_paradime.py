@@ -424,6 +424,37 @@ class TestParadimeHook(unittest.TestCase):
         mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"runId": run_id})
 
     @patch.object(ParadimeHook, "_call_gql")
+    def test_retry_bolt_schedule_from_failure_with_slug(self, mock_call_gql):
+        # Mock
+        slug = "test-schedule-a1b2c3"
+        expected_response = {"retryBoltRunFromFailure": {"runId": 999}}
+        mock_call_gql.return_value = expected_response
+
+        # Call
+        result = self.hook.retry_bolt_schedule_from_failure(slug=slug)
+
+        # Assert
+        mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"slug": slug})
+        self.assertEqual(result, 999)
+
+    @patch.object(ParadimeHook, "_call_gql")
+    def test_retry_bolt_schedule_from_failure_with_deprecated_schedule_name(self, mock_call_gql):
+        """The legacy ``schedule_name=`` kwarg keeps working and routes via ``slug:`` on the wire."""
+        schedule_name = "test_schedule"
+        mock_call_gql.return_value = {"retryBoltRunFromFailure": {"runId": 999}}
+
+        with self.assertWarns(DeprecationWarning):
+            self.hook.retry_bolt_schedule_from_failure(schedule_name=schedule_name)
+
+        mock_call_gql.assert_called_once_with(query=unittest.mock.ANY, variables={"slug": schedule_name})
+
+    def test_retry_bolt_schedule_from_failure_rejects_missing_and_both(self):
+        with self.assertRaises(ValueError):
+            self.hook.retry_bolt_schedule_from_failure()
+        with self.assertRaises(ValueError):
+            self.hook.retry_bolt_schedule_from_failure(slug="a", schedule_name="b")
+
+    @patch.object(ParadimeHook, "_call_gql")
     def test_download_artifact(self, mock_call_gql):
         # Mock
         artifact_id = 101
