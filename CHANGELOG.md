@@ -4,6 +4,33 @@ All notable changes to this provider are documented in this file. The format fol
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-10-21
+
+### Added
+
+- Account API key support. Set a `prdm_cmp_...` key in the new **Account API
+  Key** (`api_token`) connection field and the hook sends
+  `Authorization: Bearer <key>`. A `prdm_` token pasted into the legacy
+  **API Key** or **API Secret** field is detected by its prefix, same as in
+  paradime-python-sdk. Workspace tokens (`prdm_wsp_...`) are also accepted.
+- **Default Workspace Token** (`workspace_token`) connection field, sent as the
+  `X-Paradime-Workspace` header with account API keys.
+- Templated `workspace_token` argument on `ParadimeBoltDbtScheduleRunOperator`,
+  `ParadimeBoltDbtScheduleRunSensor`,
+  `ParadimeBoltDbtScheduleRunArtifactOperator` and `ParadimeHook`. It overrides
+  the connection default, so one connection can trigger, sense and download
+  artifacts from schedules in any workspace the key can access.
+- A clear `ParadimeException` when an account API key is used without a
+  workspace token on the task or the connection.
+- Example DAG `bolt_dbt_schedule_run_multi_workspace.py`: one connection,
+  schedules in two workspaces.
+
+### Changed
+
+- The README and connection form lead with account API keys. Workspace API
+  keys (key + secret) are shown as legacy. They keep working with no changes;
+  `workspace_token` is ignored for them.
+
 ## [1.3.0] — 2026-07-03
 
 ### Added

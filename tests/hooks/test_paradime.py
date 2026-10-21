@@ -86,6 +86,96 @@ class TestParadimeHook(unittest.TestCase):
         }
         self.assertEqual(result, expected_headers)
 
+    def _mock_connection(self, **extra):
+        conn = Mock()
+        conn.extra_dejson = {"api_endpoint": "https://example.com", **extra}
+        self.hook.get_connection = Mock(return_value=conn)
+
+    def test_get_auth_config_with_account_api_key(self):
+        self._mock_connection(api_token="prdm_cmp_abc", workspace_token="ws_default", api_key="", api_secret="")
+
+        result = self.hook._get_auth_config()
+
+        self.assertEqual(
+            result,
+            ParadimeHook.AuthConfig(
+                api_endpoint="https://example.com",
+                api_key=None,
+                api_secret=None,
+                api_token="prdm_cmp_abc",
+                workspace_token="ws_default",
+            ),
+        )
+
+    def test_get_request_headers_account_api_key_uses_connection_workspace(self):
+        self._mock_connection(api_token="prdm_cmp_abc", workspace_token="ws_default")
+
+        result = self.hook._get_request_headers()
+
+        self.assertEqual(
+            result,
+            {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer prdm_cmp_abc",
+                "X-Paradime-Workspace": "ws_default",
+            },
+        )
+
+    def test_get_request_headers_task_workspace_overrides_connection(self):
+        self._mock_connection(api_token="prdm_cmp_abc", workspace_token="ws_default")
+        self.hook.workspace_token = "ws_override"
+
+        result = self.hook._get_request_headers()
+
+        self.assertEqual(result["X-Paradime-Workspace"], "ws_override")
+        self.assertEqual(result["Authorization"], "Bearer prdm_cmp_abc")
+
+    def test_get_request_headers_account_api_key_without_workspace_raises(self):
+        self._mock_connection(api_token="prdm_cmp_abc")
+
+        with self.assertRaises(ParadimeException) as context:
+            self.hook._get_request_headers()
+
+        self.assertIn("workspace token", str(context.exception))
+        self.assertIn("workspace_token=", str(context.exception))
+
+    def test_get_request_headers_detects_account_api_key_in_legacy_fields(self):
+        for field in ("api_key", "api_secret"):
+            with self.subTest(field=field):
+                self._mock_connection(**{field: "prdm_cmp_abc"})
+                hook_headers = ParadimeHook(conn_id="test_conn_id", workspace_token="ws_1")
+                hook_headers.get_connection = self.hook.get_connection
+
+                result = hook_headers._get_request_headers()
+
+                self.assertEqual(result["Authorization"], "Bearer prdm_cmp_abc")
+                self.assertEqual(result["X-Paradime-Workspace"], "ws_1")
+                self.assertNotIn("X-API-KEY", result)
+                self.assertNotIn("X-API-SECRET", result)
+
+    def test_get_request_headers_workspace_api_token_needs_no_workspace(self):
+        self._mock_connection(api_token="prdm_wsp_abc")
+
+        result = self.hook._get_request_headers()
+
+        self.assertEqual(result, {"Content-Type": "application/json", "Authorization": "Bearer prdm_wsp_abc"})
+
+    def test_get_request_headers_legacy_keys_ignore_workspace_token(self):
+        self._mock_connection(api_key="key", api_secret="secret", workspace_token="ws_default")
+        self.hook.workspace_token = "ws_override"
+
+        result = self.hook._get_request_headers()
+
+        self.assertEqual(result, {"Content-Type": "application/json", "X-API-KEY": "key", "X-API-SECRET": "secret"})
+
+    def test_get_request_headers_without_credentials_raises(self):
+        self._mock_connection()
+
+        with self.assertRaises(ParadimeException) as context:
+            self.hook._get_request_headers()
+
+        self.assertIn("no credentials", str(context.exception))
+
     def test_raise_for_gql_errors_with_errors(self):
         # Mock
         mock_response = MagicMock()
