@@ -25,10 +25,10 @@ An [account API key](https://docs.paradime.io/developers/api-keys) (`prdm_cmp_..
 | Field | Value |
 | --- | --- |
 | API Endpoint | The API endpoint shown with the key |
-| Account API Key | Your `prdm_cmp_...` key |
+| API Secret | Your `prdm_cmp_...` key |
 | Default Workspace UID | Optional. The workspace to use when a task does not set `workspace_uid` |
 
-Leave **API Key (legacy)** and **API Secret (legacy)** blank.
+Leave **API Key** blank. The provider detects an account API key from its `prdm_cmp_` prefix, same as [paradime-python-sdk](https://github.com/paradime-io/paradime-python-sdk).
 
 You can also create the connection from an environment variable:
 
@@ -37,7 +37,7 @@ export AIRFLOW_CONN_PARADIME_DEFAULT='{
     "conn_type": "paradime",
     "extra": {
         "api_endpoint": "https://api.paradime.io/api/v1/<company_token>/graphql",
-        "api_token": "prdm_cmp_...",
+        "api_secret": "prdm_cmp_...",
         "workspace_uid": "<default_workspace_uid>"
     }
 }'
@@ -50,7 +50,7 @@ Every request with an account API key needs a workspace UID. Set it on the task 
 Workspace API keys still work with no changes. A workspace key and secret are bound to one workspace, so you need one connection per workspace.
 
 1. Generate your API key, secret and endpoint from Paradime Workspace settings.
-2. Create a connection in Airflow and fill in **API Endpoint**, **API Key (legacy)** and **API Secret (legacy)**. Leave **Account API Key** blank.
+2. Create a connection in Airflow and fill in **API Endpoint**, **API Key** and **API Secret**.
 
 `workspace_uid` has no effect on a connection that uses a workspace API key.
 

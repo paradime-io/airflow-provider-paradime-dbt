@@ -14,7 +14,7 @@ from paradime_dbt_provider.hooks.paradime import ParadimeHook
 from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunArtifactOperator, ParadimeBoltDbtScheduleRunOperator
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
 
-CONN_EXTRA = {"api_endpoint": "https://api.paradime.io/api/v1/company/graphql", "api_token": "prdm_cmp_abc"}
+CONN_EXTRA = {"api_endpoint": "https://api.paradime.io/api/v1/company/graphql", "api_secret": "prdm_cmp_abc"}
 
 # Run ids returned per workspace, so the mocked API can check that each call
 # reaches the workspace that owns the run.

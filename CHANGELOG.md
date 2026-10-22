@@ -8,11 +8,11 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Account API key support. Set a `prdm_cmp_...` key in the new **Account API
-  Key** (`api_token`) connection field and the hook sends
-  `Authorization: Bearer <key>`. A `prdm_` token pasted into the legacy
-  **API Key** or **API Secret** field is detected by its prefix, same as in
-  paradime-python-sdk. Workspace API tokens (`prdm_wsp_...`) are also accepted.
+- Account API key support. Set a `prdm_cmp_...` key in the existing **API
+  Secret** (`api_secret`) connection field and leave **API Key** blank. The
+  hook detects the token from its prefix and sends `Authorization: Bearer <key>`,
+  same as paradime-python-sdk. Workspace tokens (`prdm_wsp_...`) are also
+  accepted.
 - **Default Workspace UID** (`workspace_uid`) connection field, sent as the
   `X-Paradime-Workspace` header with account API keys.
 - Templated `workspace_uid` argument on `ParadimeBoltDbtScheduleRunOperator`,

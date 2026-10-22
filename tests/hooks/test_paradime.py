@@ -92,7 +92,7 @@ class TestParadimeHook(unittest.TestCase):
         self.hook.get_connection = Mock(return_value=conn)
 
     def test_get_auth_config_with_account_api_key(self):
-        self._mock_connection(api_token="prdm_cmp_abc", workspace_uid="ws_default", api_key="", api_secret="")
+        self._mock_connection(api_secret="prdm_cmp_abc", workspace_uid="ws_default", api_key="")
 
         result = self.hook._get_auth_config()
 
@@ -101,14 +101,13 @@ class TestParadimeHook(unittest.TestCase):
             ParadimeHook.AuthConfig(
                 api_endpoint="https://example.com",
                 api_key=None,
-                api_secret=None,
-                api_token="prdm_cmp_abc",
+                api_secret="prdm_cmp_abc",
                 workspace_uid="ws_default",
             ),
         )
 
     def test_get_request_headers_account_api_key_uses_connection_workspace(self):
-        self._mock_connection(api_token="prdm_cmp_abc", workspace_uid="ws_default")
+        self._mock_connection(api_secret="prdm_cmp_abc", workspace_uid="ws_default")
 
         result = self.hook._get_request_headers()
 
@@ -122,7 +121,7 @@ class TestParadimeHook(unittest.TestCase):
         )
 
     def test_get_request_headers_task_workspace_overrides_connection(self):
-        self._mock_connection(api_token="prdm_cmp_abc", workspace_uid="ws_default")
+        self._mock_connection(api_secret="prdm_cmp_abc", workspace_uid="ws_default")
         self.hook.workspace_uid = "ws_override"
 
         result = self.hook._get_request_headers()
@@ -131,7 +130,7 @@ class TestParadimeHook(unittest.TestCase):
         self.assertEqual(result["Authorization"], "Bearer prdm_cmp_abc")
 
     def test_get_request_headers_account_api_key_without_workspace_raises(self):
-        self._mock_connection(api_token="prdm_cmp_abc")
+        self._mock_connection(api_secret="prdm_cmp_abc")
 
         with self.assertRaises(ParadimeException) as context:
             self.hook._get_request_headers()
@@ -139,22 +138,25 @@ class TestParadimeHook(unittest.TestCase):
         self.assertIn("workspace UID", str(context.exception))
         self.assertIn("workspace_uid=", str(context.exception))
 
-    def test_get_request_headers_detects_account_api_key_in_legacy_fields(self):
-        for field in ("api_key", "api_secret"):
-            with self.subTest(field=field):
-                self._mock_connection(**{field: "prdm_cmp_abc"})
-                hook_headers = ParadimeHook(conn_id="test_conn_id", workspace_uid="ws_1")
-                hook_headers.get_connection = self.hook.get_connection
+    def test_get_request_headers_account_api_key_ignores_api_key(self):
+        self._mock_connection(api_key="leftover_key", api_secret="prdm_cmp_abc")
+        hook = ParadimeHook(conn_id="test_conn_id", workspace_uid="ws_1")
+        hook.get_connection = self.hook.get_connection
 
-                result = hook_headers._get_request_headers()
+        result = hook._get_request_headers()
 
-                self.assertEqual(result["Authorization"], "Bearer prdm_cmp_abc")
-                self.assertEqual(result["X-Paradime-Workspace"], "ws_1")
-                self.assertNotIn("X-API-KEY", result)
-                self.assertNotIn("X-API-SECRET", result)
+        self.assertEqual(result, {"Content-Type": "application/json", "Authorization": "Bearer prdm_cmp_abc", "X-Paradime-Workspace": "ws_1"})
+
+    def test_get_request_headers_legacy_secret_without_api_key_raises(self):
+        self._mock_connection(api_secret="secret")
+
+        with self.assertRaises(ParadimeException) as context:
+            self.hook._get_request_headers()
+
+        self.assertIn("needs an 'API Key'", str(context.exception))
 
     def test_get_request_headers_workspace_api_token_needs_no_workspace(self):
-        self._mock_connection(api_token="prdm_wsp_abc")
+        self._mock_connection(api_secret="prdm_wsp_abc")
 
         result = self.hook._get_request_headers()
 
@@ -174,7 +176,7 @@ class TestParadimeHook(unittest.TestCase):
         with self.assertRaises(ParadimeException) as context:
             self.hook._get_request_headers()
 
-        self.assertIn("no credentials", str(context.exception))
+        self.assertIn("no API secret", str(context.exception))
 
     def test_raise_for_gql_errors_with_errors(self):
         # Mock
