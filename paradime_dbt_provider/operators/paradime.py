@@ -29,9 +29,12 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         run did not fail (or there is no previous run), a new run is triggered
         as usual. Note that ``commands`` and ``branch`` overrides do not apply
         to a resumed run. Defaults to False.
+    :param workspace_uid: Optional. The workspace to call when the connection uses an
+        account API key. Overrides the default workspace UID set on the connection, so
+        one connection can reach every workspace the key can access. Templated.
     """
 
-    template_fields = ["slug", "schedule_name", "commands"]
+    template_fields = ["slug", "schedule_name", "commands", "workspace_uid"]
 
     def __init__(
         self,
@@ -42,17 +45,20 @@ class ParadimeBoltDbtScheduleRunOperator(BaseOperator):
         commands: list[str] | None = None,
         branch: str | None = None,
         retry_from_failure: bool = False,
+        workspace_uid: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
         self.slug = slug
         self.schedule_name = schedule_name
-        self.hook = ParadimeHook(conn_id=conn_id)
+        self.workspace_uid = workspace_uid
+        self.hook = ParadimeHook(conn_id=conn_id, workspace_uid=workspace_uid)
         self.commands = commands
         self.branch = branch
         self.retry_from_failure = retry_from_failure
 
     def execute(self, context: Context) -> int:
+        self.hook.workspace_uid = self.workspace_uid  # pick up the rendered template value
         # XOR validation is deferred to the hook so DAG parsing doesn't raise
         # on import — only the scheduler-heartbeat-driven execute() does.
         if self.retry_from_failure and self._latest_run_failed():
@@ -89,9 +95,12 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
     :param artifact_path: The path to download the artifact to. Example: target/manifest.json
     :param command_index: Optional. The index of the command to download the artifact from. Defaults to searching from the last command up to the first, and returning the first artifact found. Index starts at 0.
     :param output_file_name: Optional. The name of the file to download the artifact to. Defaults to the <run_id>_<artifact_file_name>. Example: 42_manifest.json
+    :param workspace_uid: Optional. The workspace to call when the connection uses an
+        account API key. Overrides the default workspace UID set on the connection, so
+        one connection can reach every workspace the key can access. Templated.
     """
 
-    template_fields = ["run_id", "artifact_path", "command_index", "output_file_name"]
+    template_fields = ["run_id", "artifact_path", "command_index", "output_file_name", "workspace_uid"]
 
     def __init__(
         self,
@@ -101,16 +110,19 @@ class ParadimeBoltDbtScheduleRunArtifactOperator(BaseOperator):
         artifact_path: str,
         command_index: int | None = None,
         output_file_name: str | None = None,
+        workspace_uid: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.hook = ParadimeHook(conn_id=conn_id)
+        self.workspace_uid = workspace_uid
+        self.hook = ParadimeHook(conn_id=conn_id, workspace_uid=workspace_uid)
         self.run_id = run_id
         self.artifact_path = artifact_path
         self.command_index = command_index
         self.output_file_name = output_file_name
 
     def execute(self, context: Context) -> str:
+        self.hook.workspace_uid = self.workspace_uid  # pick up the rendered template value
         run_commands = self.hook.get_bolt_run_commands(run_id=self.run_id)
 
         commands_to_search = []

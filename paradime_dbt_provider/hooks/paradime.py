@@ -14,6 +14,21 @@ class ParadimeException(Exception):
     pass
 
 
+# Prefixes used by the bearer-token style API secrets. A company token (account API key)
+# is valid across a set of workspaces, so every request must select its target workspace
+# via the X-Paradime-Workspace header. A workspace token is scoped to a single workspace
+# already, same as a legacy key/secret pair. Mirrors paradime-python-sdk's API client.
+COMPANY_API_TOKEN_PREFIX = "prdm_cmp_"
+WORKSPACE_API_TOKEN_PREFIX = "prdm_wsp_"
+
+WORKSPACE_SELECTION_HEADER = "X-Paradime-Workspace"
+
+
+def _is_bearer_token(api_secret: str) -> bool:
+    """Return True if ``api_secret`` is actually a bearer token rather than a legacy secret."""
+    return api_secret.startswith(COMPANY_API_TOKEN_PREFIX) or api_secret.startswith(WORKSPACE_API_TOKEN_PREFIX)
+
+
 def _resolve_slug_or_schedule_name(
     *,
     slug: str | None,
@@ -152,7 +167,19 @@ class ParadimeHook(BaseHook):
     """
     Interact with Paradime API.
 
+    The connection's ``api_secret`` accepts either a bearer token or a legacy API secret,
+    same as paradime-python-sdk. The auth mechanism is detected from its prefix:
+
+    - Account API key (``prdm_cmp_...``, recommended): ``api_key`` is not needed, but each
+      request needs a workspace UID. Set a default on the connection, or pass
+      ``workspace_uid`` here to override it.
+    - Workspace token (``prdm_wsp_...``): ``api_key`` is not needed.
+    - Legacy secret: ``api_key`` must also be set.
+
     :param conn_id: The Airflow connection id to use when connecting to Paradime.
+    :param workspace_uid: Optional. The workspace to send requests to when the
+        connection uses an account API key. Overrides the ``workspace_uid`` set on
+        the connection. Not used with workspace API keys, which are bound to one workspace.
     """
 
     conn_name_attr = "conn_id"
@@ -172,8 +199,9 @@ class ParadimeHook(BaseHook):
 
         return {
             "api_endpoint": StringField(lazy_gettext("API Endpoint"), widget=BS3TextFieldWidget()),
-            "api_key": StringField(lazy_gettext("API Key"), widget=BS3TextFieldWidget()),
             "api_secret": PasswordField(lazy_gettext("API Secret"), widget=BS3PasswordFieldWidget()),
+            "workspace_uid": StringField(lazy_gettext("Default Workspace UID"), widget=BS3TextFieldWidget()),
+            "api_key": StringField(lazy_gettext("API Key"), widget=BS3TextFieldWidget()),
             "proxy": StringField(lazy_gettext("Proxy"), widget=BS3TextFieldWidget()),
         }
 
@@ -187,9 +215,10 @@ class ParadimeHook(BaseHook):
             "hidden_fields": ["port", "password", "login", "schema", "extra", "host"],
             "relabeling": {},
             "placeholders": {
-                "api_endpoint": "Generate API endpoint from Paradime Workspace settings.",
-                "api_key": "Generate API key from Paradime Workspace settings.",
-                "api_secret": "Generate API secret from Paradime Workspace settings.",
+                "api_endpoint": "API endpoint shown when you create the API key in Paradime.",
+                "api_secret": "Account API key (prdm_cmp_...), recommended. Or a legacy workspace API secret.",
+                "workspace_uid": "Required for account API keys, unless every task sets workspace_uid.",
+                "api_key": "Only for a legacy workspace API secret. Leave blank for account API keys.",
                 "proxy": "Proxy URL (e.g., http://proxy.example.com:8080). Leave blank or set to 'none' to disable.",
             },
         }
@@ -197,9 +226,11 @@ class ParadimeHook(BaseHook):
     def __init__(
         self,
         conn_id: str,
+        workspace_uid: str | None = None,
     ) -> None:
         super().__init__()
         self.conn_id = conn_id
+        self.workspace_uid = workspace_uid
 
     @dataclass
     class AuthConfig:
@@ -208,9 +239,10 @@ class ParadimeHook(BaseHook):
         """
 
         api_endpoint: str
-        api_key: str
-        api_secret: str
+        api_key: str | None
+        api_secret: str | None
         proxy: str | None = None
+        workspace_uid: str | None = None
 
     def _get_auth_config(self) -> AuthConfig:
         """
@@ -229,20 +261,49 @@ class ParadimeHook(BaseHook):
 
         return self.AuthConfig(
             api_endpoint=extra["api_endpoint"],
-            api_key=extra["api_key"],
-            api_secret=extra["api_secret"],
+            api_key=extra.get("api_key") or None,
+            api_secret=extra.get("api_secret") or None,
             proxy=proxy,
+            workspace_uid=extra.get("workspace_uid") or None,
         )
 
     def _get_api_endpoint(self) -> str:
         return self._get_auth_config().api_endpoint
 
     def _get_request_headers(self) -> dict[str, str]:
-        return {
-            "Content-Type": "application/json",
-            "X-API-KEY": self._get_auth_config().api_key,
-            "X-API-SECRET": self._get_auth_config().api_secret,
-        }
+        auth_config = self._get_auth_config()
+        headers = {"Content-Type": "application/json"}
+
+        api_secret = auth_config.api_secret
+        if not api_secret:
+            raise ParadimeException(f"Paradime connection {self.conn_id!r} has no API secret. Set an account API key ({COMPANY_API_TOKEN_PREFIX}...) or a legacy workspace API secret in 'API Secret'.")
+
+        if not _is_bearer_token(api_secret):
+            # Legacy workspace API key + secret. The key is bound to one workspace,
+            # so no workspace header is sent.
+            if not auth_config.api_key:
+                raise ParadimeException(
+                    f"Paradime connection {self.conn_id!r} needs an 'API Key' when 'API Secret' is a legacy secret "
+                    f"(i.e. does not start with {WORKSPACE_API_TOKEN_PREFIX!r} or {COMPANY_API_TOKEN_PREFIX!r})."
+                )
+            headers["X-API-KEY"] = auth_config.api_key
+            headers["X-API-SECRET"] = api_secret
+            return headers
+
+        headers["Authorization"] = f"Bearer {api_secret}"
+
+        # The task-level workspace UID overrides the connection default.
+        workspace_uid = self.workspace_uid or auth_config.workspace_uid
+        if workspace_uid:
+            headers[WORKSPACE_SELECTION_HEADER] = workspace_uid
+        elif api_secret.startswith(COMPANY_API_TOKEN_PREFIX):
+            raise ParadimeException(
+                f"Paradime connection {self.conn_id!r} uses an account API key, which needs a workspace UID "
+                "to know which workspace to call. Pass `workspace_uid=` to the task (or ParadimeHook), "
+                "or set a 'Default Workspace UID' on the connection."
+            )
+
+        return headers
 
     def _get_proxies(self) -> dict[str, str]:
         """

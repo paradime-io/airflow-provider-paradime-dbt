@@ -16,22 +16,28 @@ class ParadimeBoltDbtScheduleRunSensor(BaseSensorOperator):
 
     :param conn_id: The Airflow connection id to use when connecting to Paradime.
     :param run_id: The id of the schedule run to wait for.
+    :param workspace_uid: Optional. The workspace to call when the connection uses an
+        account API key. Overrides the default workspace UID set on the connection, so
+        one connection can reach every workspace the key can access. Templated.
     """
 
-    template_fields = ["run_id"]
+    template_fields = ["run_id", "workspace_uid"]
 
     def __init__(
         self,
         *,
         conn_id: str,
         run_id: int,
+        workspace_uid: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        self.hook = ParadimeHook(conn_id=conn_id)
+        self.workspace_uid = workspace_uid
+        self.hook = ParadimeHook(conn_id=conn_id, workspace_uid=workspace_uid)
         self.run_id = run_id
 
     def poke(self, context: Context) -> bool:
+        self.hook.workspace_uid = self.workspace_uid  # pick up the rendered template value
         state = self.hook.get_bolt_run_status(self.run_id)
 
         more_info = f"More details at: https://app.paradime.io/bolt/run_id/{self.run_id}"
