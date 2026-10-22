@@ -68,11 +68,11 @@ class TestWorkspacePerTask(unittest.TestCase):
             for workspace, slug in (("ws_marketing", "marketing-daily"), ("ws_finance", "finance-daily")):
                 with self.subTest(workspace=workspace):
                     run_id = ParadimeBoltDbtScheduleRunOperator(
-                        task_id=f"run_{workspace}", conn_id="paradime", slug=slug, workspace_token=workspace
+                        task_id=f"run_{workspace}", conn_id="paradime", slug=slug, workspace_uid=workspace
                     ).execute(context=MagicMock())
                     self.assertEqual(run_id, RUN_IDS[workspace])
 
-                    sensor = ParadimeBoltDbtScheduleRunSensor(task_id=f"wait_{workspace}", conn_id="paradime", run_id=run_id, workspace_token=workspace)
+                    sensor = ParadimeBoltDbtScheduleRunSensor(task_id=f"wait_{workspace}", conn_id="paradime", run_id=run_id, workspace_uid=workspace)
                     self.assertTrue(sensor.poke(context=MagicMock()))
 
                     output_file = str(Path(tmp) / f"{workspace}_manifest.json")
@@ -82,7 +82,7 @@ class TestWorkspacePerTask(unittest.TestCase):
                         run_id=run_id,
                         artifact_path="target/manifest.json",
                         output_file_name=output_file,
-                        workspace_token=workspace,
+                        workspace_uid=workspace,
                     ).execute(context=MagicMock())
                     self.assertEqual(Path(path).read_text(), f"https://s3.example.com/{workspace}/manifest.json")
 
@@ -90,10 +90,10 @@ class TestWorkspacePerTask(unittest.TestCase):
         self.assertEqual(sent_workspaces, set(RUN_IDS))
 
     def test_rendered_template_value_is_used_at_execute(self):
-        """``workspace_token`` is a template field: the value rendered before execute() wins."""
-        operator = ParadimeBoltDbtScheduleRunOperator(task_id="run", conn_id="paradime", slug="s", workspace_token="{{ params.ws }}")
-        self.assertIn("workspace_token", operator.template_fields)
-        operator.workspace_token = "ws_finance"  # what Airflow does after rendering
+        """``workspace_uid`` is a template field: the value rendered before execute() wins."""
+        operator = ParadimeBoltDbtScheduleRunOperator(task_id="run", conn_id="paradime", slug="s", workspace_uid="{{ params.ws }}")
+        self.assertIn("workspace_uid", operator.template_fields)
+        operator.workspace_uid = "ws_finance"  # what Airflow does after rendering
 
         with patch("paradime_dbt_provider.hooks.paradime.requests.post", side_effect=_fake_post):
             self.assertEqual(operator.execute(context=MagicMock()), RUN_IDS["ws_finance"])

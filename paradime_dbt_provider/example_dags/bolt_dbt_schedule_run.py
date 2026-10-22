@@ -3,7 +3,7 @@ from airflow.decorators import dag  # type: ignore[import]
 from paradime_dbt_provider.operators.paradime import ParadimeBoltDbtScheduleRunArtifactOperator, ParadimeBoltDbtScheduleRunOperator
 from paradime_dbt_provider.sensors.paradime import ParadimeBoltDbtScheduleRunSensor
 
-# The connection can use an account API key with a default workspace token, or a legacy
+# The connection can use an account API key with a default workspace UID, or a legacy
 # workspace API key. To trigger schedules in several workspaces through one connection,
 # see bolt_dbt_schedule_run_multi_workspace.py.
 PARADIME_CONN_ID = "your_paradime_conn_id"  # Update this to your connection id

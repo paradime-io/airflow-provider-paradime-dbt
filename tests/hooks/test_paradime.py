@@ -92,7 +92,7 @@ class TestParadimeHook(unittest.TestCase):
         self.hook.get_connection = Mock(return_value=conn)
 
     def test_get_auth_config_with_account_api_key(self):
-        self._mock_connection(api_token="prdm_cmp_abc", workspace_token="ws_default", api_key="", api_secret="")
+        self._mock_connection(api_token="prdm_cmp_abc", workspace_uid="ws_default", api_key="", api_secret="")
 
         result = self.hook._get_auth_config()
 
@@ -103,12 +103,12 @@ class TestParadimeHook(unittest.TestCase):
                 api_key=None,
                 api_secret=None,
                 api_token="prdm_cmp_abc",
-                workspace_token="ws_default",
+                workspace_uid="ws_default",
             ),
         )
 
     def test_get_request_headers_account_api_key_uses_connection_workspace(self):
-        self._mock_connection(api_token="prdm_cmp_abc", workspace_token="ws_default")
+        self._mock_connection(api_token="prdm_cmp_abc", workspace_uid="ws_default")
 
         result = self.hook._get_request_headers()
 
@@ -122,8 +122,8 @@ class TestParadimeHook(unittest.TestCase):
         )
 
     def test_get_request_headers_task_workspace_overrides_connection(self):
-        self._mock_connection(api_token="prdm_cmp_abc", workspace_token="ws_default")
-        self.hook.workspace_token = "ws_override"
+        self._mock_connection(api_token="prdm_cmp_abc", workspace_uid="ws_default")
+        self.hook.workspace_uid = "ws_override"
 
         result = self.hook._get_request_headers()
 
@@ -136,14 +136,14 @@ class TestParadimeHook(unittest.TestCase):
         with self.assertRaises(ParadimeException) as context:
             self.hook._get_request_headers()
 
-        self.assertIn("workspace token", str(context.exception))
-        self.assertIn("workspace_token=", str(context.exception))
+        self.assertIn("workspace UID", str(context.exception))
+        self.assertIn("workspace_uid=", str(context.exception))
 
     def test_get_request_headers_detects_account_api_key_in_legacy_fields(self):
         for field in ("api_key", "api_secret"):
             with self.subTest(field=field):
                 self._mock_connection(**{field: "prdm_cmp_abc"})
-                hook_headers = ParadimeHook(conn_id="test_conn_id", workspace_token="ws_1")
+                hook_headers = ParadimeHook(conn_id="test_conn_id", workspace_uid="ws_1")
                 hook_headers.get_connection = self.hook.get_connection
 
                 result = hook_headers._get_request_headers()
@@ -160,9 +160,9 @@ class TestParadimeHook(unittest.TestCase):
 
         self.assertEqual(result, {"Content-Type": "application/json", "Authorization": "Bearer prdm_wsp_abc"})
 
-    def test_get_request_headers_legacy_keys_ignore_workspace_token(self):
-        self._mock_connection(api_key="key", api_secret="secret", workspace_token="ws_default")
-        self.hook.workspace_token = "ws_override"
+    def test_get_request_headers_legacy_keys_ignore_workspace_uid(self):
+        self._mock_connection(api_key="key", api_secret="secret", workspace_uid="ws_default")
+        self.hook.workspace_uid = "ws_override"
 
         result = self.hook._get_request_headers()
 
